@@ -173,6 +173,7 @@ export class SemanticProcessor {
     const resolvedContext = await this.contextLoader.load(targetCtx);
     const vocab = resolvedContext['@vocab'] || '';
     const base = resolvedContext['@base'] || '';
+    const isSchemaOrgVocab = vocab.startsWith("http://schema.org") || vocab.startsWith("https://schema.org");
 
     const reverseMappings: Record<string, string> = {};
     for (const [k, v] of Object.entries(resolvedContext)) {
@@ -188,6 +189,15 @@ export class SemanticProcessor {
       if (iri.startsWith('@')) return iri;
       if (reverseMappings[iri]) {
         return reverseMappings[iri];
+      }
+
+      // Compact protocol-agnostically if Schema.org vocab is used
+      if (isSchemaOrgVocab) {
+        const schemaIri = iri.replace(/^http:\/\/schema\.org\//, "https://schema.org/").replace(/^https:\/\/schema\.org\//, "https://schema.org/");
+        const schemaVocab = vocab.replace(/^http:\/\/schema\.org\//, "https://schema.org/").replace(/^https:\/\/schema\.org\//, "https://schema.org/");
+        if (schemaIri.startsWith(schemaVocab)) {
+          return schemaIri.slice(schemaVocab.length);
+        }
       }
 
       // Compact with @base if present

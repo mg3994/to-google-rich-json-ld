@@ -223,4 +223,36 @@ describe('CompatibilityEngine', () => {
     expect(serialized["author"]["@type"]).toBe("https://schema.org/Person");
     expect(serialized["author"]["name"]).toBe("Chef James");
   });
+
+  it('should deduplicate types and structurally identical nested items', () => {
+    const builder = new ASTBuilder();
+    const serializer = new ASTSerializer();
+    const engine = new CompatibilityEngine(defaultConfig);
+
+    const doc = builder.build({
+      "@context": "https://schema.org",
+      "@type": ["Product", "Product"], // Redundant types
+      "name": "Widget",
+      "offers": [
+        {
+          "@type": "Offer",
+          "price": 10
+        },
+        {
+          "@type": "Offer",
+          "price": 10 // Identical duplicated offer
+        }
+      ]
+    });
+
+    const transformedDoc = engine.transform(doc);
+    const serialized = serializer.serialize(transformedDoc);
+
+    // Type should be deduplicated to a single string (as there's only 1 unique type remaining)
+    expect(serialized["@type"]).toBe("Product");
+
+    // Duplicated offers should be structurally deduplicated to just 1 offer item
+    expect(Array.isArray(serialized["offers"])).toBe(false);
+    expect(serialized["offers"]["price"]).toBe(10);
+  });
 });

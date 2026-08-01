@@ -8,7 +8,9 @@ import {
   GraphObjectNode,
   ReverseObjectNode,
   IncludedObjectNode,
-  ContextNode
+  ContextNode,
+  ListObjectNode,
+  SetObjectNode
 } from '../types/index.js';
 
 import {
@@ -40,6 +42,47 @@ function extractContextDefaults(ctx: any): Record<string, any> {
   }
   return defaults;
 }
+
+const areNodesEqual = (node1: ASTNode, node2: ASTNode): boolean => {
+  if (node1.type !== node2.type) return false;
+  if (node1.type === "Literal" || node1.type === "IRI" || node1.type === "BlankNode" || node1.type === "Keyword") {
+    return (node1 as any).value === (node2 as any).value;
+  }
+  if (node1.type === "ValueObject") {
+    const v1 = node1 as ValueObjectNode;
+    const v2 = node2 as ValueObjectNode;
+    return v1.value === v2.value && v1.language === v2.language && v1.direction === v2.direction && v1.dataType === v2.dataType;
+  }
+  if (node1.type === "NodeObject") {
+    const n1 = node1 as NodeObjectNode;
+    const n2 = node2 as NodeObjectNode;
+    if (n1.id !== n2.id) return false;
+    if (n1.types.length !== n2.types.length || !n1.types.every((t, i) => t === n2.types[i])) return false;
+    const keys1 = Object.keys(n1.properties);
+    const keys2 = Object.keys(n2.properties);
+    if (keys1.length !== keys2.length) return false;
+    return keys1.every(k => {
+      const val1 = n1.properties[k];
+      const val2 = n2.properties[k];
+      if (!val2) return false;
+      if (val1.length !== val2.length) return false;
+      return val1.every((item, idx) => areNodesEqual(item, val2[idx]));
+    });
+  }
+  if (node1.type === "ListObject") {
+    const l1 = node1 as ListObjectNode;
+    const l2 = node2 as ListObjectNode;
+    if (l1.list.length !== l2.list.length) return false;
+    return l1.list.every((item, idx) => areNodesEqual(item, l2.list[idx]));
+  }
+  if (node1.type === "SetObject") {
+    const s1 = node1 as SetObjectNode;
+    const s2 = node2 as SetObjectNode;
+    if (s1.set.length !== s2.set.length) return false;
+    return s1.set.every((item, idx) => areNodesEqual(item, s2.set[idx]));
+  }
+  return false;
+};
 
 export class CompatibilityEngine {
   private plugins: Plugin[] = [];
@@ -306,7 +349,7 @@ export class CompatibilityEngine {
           return node;
         },
 
-        // 2. Normalize and Secure Schema.org IRI schemas & Enum URLs: http -> https
+        // 2. Normalize, Secure, and Deduplicate Schema.org IRI schemas & Enum URLs: http -> https
         (node: ASTNode, config: Config): ASTNode => {
           if (node.type === "Context" && typeof node.value === 'string') {
             if (node.value.startsWith("http://schema.org")) {
@@ -315,9 +358,9 @@ export class CompatibilityEngine {
           }
 
           if (config.target === "google") {
-            // Secure types and IDs in NodeObjects
+            // Secure and deduplicate types, and secure IDs in NodeObjects
             if (node.type === "NodeObject") {
-              const types = node.types.map(t => t.startsWith("http://schema.org") ? t.replace("http://schema.org", "https://schema.org") : t);
+              const types = Array.from(new Set(node.types.map(t => t.startsWith("http://schema.org") ? t.replace("http://schema.org", "https://schema.org") : t)));
               const id = node.id && node.id.startsWith("http://schema.org") ? node.id.replace("http://schema.org", "https://schema.org") : node.id;
               return new NodeObjectNodeImpl(id, types, node.properties);
             }
@@ -425,7 +468,7 @@ export class CompatibilityEngine {
         },
 
         // 5. Datetime ISO8601 Normalization, Numeric Field Cleaning, Empty Property Pruning,
-        // Auto-wrapping of lists, Nested Type Inference, and Relative URL Expansion using @base.
+        // Auto-wrapping of lists, Nested Type Inference, Relative URL Expansion, and Structural Value Deduplication.
         (node: ASTNode, config: Config, base?: string): ASTNode => {
           if (config.target === "google" && node.type === "NodeObject") {
             const properties: Record<string, ASTNode[]> = {};
@@ -566,9 +609,17 @@ export class CompatibilityEngine {
                 cleanedList.push(item);
               }
 
+              // Deep Structural Value Deduplication to remove identical duplicated array items
+              const deduplicatedList: ASTNode[] = [];
+              for (const item of cleanedList) {
+                if (!deduplicatedList.some(existing => areNodesEqual(existing, item))) {
+                  deduplicatedList.push(item);
+                }
+              }
+
               // Only include the property if it is non-empty
-              if (cleanedList.length > 0) {
-                properties[k] = cleanedList;
+              if (deduplicatedList.length > 0) {
+                properties[k] = deduplicatedList;
               }
             }
 
