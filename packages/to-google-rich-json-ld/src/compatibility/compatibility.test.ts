@@ -342,4 +342,24 @@ describe('CompatibilityEngine', () => {
     expect(serialized["image"]).toBe("https://example.com/logo.png");
     expect(serialized["ratingCount"]).toBe(1);
   });
+
+  it('should normalize ISBN codes and DayOfWeek names', () => {
+    const builder = new ASTBuilder();
+    const serializer = new ASTSerializer();
+    const engine = new CompatibilityEngine(defaultConfig);
+
+    const doc = builder.build({
+      "@context": "https://schema.org",
+      "@type": "Book",
+      "name": "Gatsby",
+      "isbn": "ISBN 978-3-16-148410-0", // ISBN format
+      "dayOfWeek": "Mon" // Day name abbreviation
+    });
+
+    const transformedDoc = engine.transform(doc);
+    const serialized = serializer.serialize(transformedDoc);
+
+    expect(serialized["isbn"]).toBe("9783161484100");
+    expect(serialized["dayOfWeek"]).toBe("https://schema.org/Monday");
+  });
 });

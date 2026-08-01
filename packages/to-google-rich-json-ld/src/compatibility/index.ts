@@ -475,7 +475,7 @@ export class CompatibilityEngine {
 
         // 5. Datetime ISO8601 Normalization, Numeric Field Cleaning, Empty Property Pruning,
         // Auto-wrapping of lists, Nested Type Inference, Relative URL Expansion, Rating Normalization, SameAs securing,
-        // Singularization / Pluralization, White-space normalization, and Structural Value Deduplication.
+        // Singularization / Pluralization, White-space normalization, ISBN Normalization, DayOfWeek Normalization, and Structural Value Deduplication.
         (node: ASTNode, config: Config, base?: string): ASTNode => {
           if (config.target === "google" && node.type === "NodeObject") {
             const properties: Record<string, ASTNode[]> = {};
@@ -670,6 +670,49 @@ export class CompatibilityEngine {
                     const val = item.value.replace(/\s+/g, ' ').trim();
                     cleanedList.push(new ValueObjectNodeImpl(val, item.language, item.direction, item.dataType));
                     continue;
+                  }
+                }
+
+                // ISBN Normalization (stripping "ISBN" labels, hyphens, and spaces)
+                const isIsbnProp = cleanLocalKey === "isbn" || k === "isbn" || k === "https://schema.org/isbn";
+                if (isIsbnProp) {
+                  if (item.type === "Literal" && typeof item.value === 'string') {
+                    let val = item.value.replace(/isbn/i, '').replace(/[\s-]/g, '').trim();
+                    cleanedList.push(new LiteralNodeImpl(val));
+                    continue;
+                  }
+                  if (item.type === "ValueObject" && typeof item.value === 'string') {
+                    let val = item.value.replace(/isbn/i, '').replace(/[\s-]/g, '').trim();
+                    cleanedList.push(new ValueObjectNodeImpl(val, item.language, item.direction, item.dataType));
+                    continue;
+                  }
+                }
+
+                // DayOfWeek Normalization (mapping abbreviations and lower days to standard Schema enums)
+                const isDayOfWeekProp = cleanLocalKey === "dayOfWeek" || k === "dayOfWeek" || k === "https://schema.org/dayOfWeek";
+                if (isDayOfWeekProp) {
+                  const dayMap: Record<string, string> = {
+                    "mon": "https://schema.org/Monday", "monday": "https://schema.org/Monday",
+                    "tue": "https://schema.org/Tuesday", "tuesday": "https://schema.org/Tuesday",
+                    "wed": "https://schema.org/Wednesday", "wednesday": "https://schema.org/Wednesday",
+                    "thu": "https://schema.org/Thursday", "thursday": "https://schema.org/Thursday",
+                    "fri": "https://schema.org/Friday", "friday": "https://schema.org/Friday",
+                    "sat": "https://schema.org/Saturday", "saturday": "https://schema.org/Saturday",
+                    "sun": "https://schema.org/Sunday", "sunday": "https://schema.org/Sunday"
+                  };
+                  if (item.type === "Literal" && typeof item.value === 'string') {
+                    const localVal = item.value.replace("https://schema.org/", "").replace("http://schema.org/", "").trim().toLowerCase();
+                    if (dayMap[localVal]) {
+                      cleanedList.push(new LiteralNodeImpl(dayMap[localVal]));
+                      continue;
+                    }
+                  }
+                  if (item.type === "ValueObject" && typeof item.value === 'string') {
+                    const localVal = item.value.replace("https://schema.org/", "").replace("http://schema.org/", "").trim().toLowerCase();
+                    if (dayMap[localVal]) {
+                      cleanedList.push(new ValueObjectNodeImpl(dayMap[localVal], item.language, item.direction, item.dataType));
+                      continue;
+                    }
                   }
                 }
 

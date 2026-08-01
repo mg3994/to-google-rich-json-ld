@@ -9,7 +9,7 @@
     "to-google-rich-json-ld": "./dist/cli/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node -e \"const fs = require('fs'); fs.mkdirSync('./dist/generated', { recursive: true }); fs.readdirSync('./src/generated').filter(f => f.endsWith('.json')).forEach(f => fs.copyFileSync('./src/generated/' + f, './dist/generated/' + f));\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "crawl": "node --experimental-strip-types scripts/crawl-jsonld-specs.ts",
