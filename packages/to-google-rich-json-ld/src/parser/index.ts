@@ -48,13 +48,17 @@ export class Parser {
         const str = chunks.join('');
         return JSON.parse(str);
       } else {
-        const buffer = Buffer.concat(chunks);
-        const str = buffer.toString('utf-8');
-        return JSON.parse(str);
+        if (typeof Buffer !== 'undefined') {
+          const buffer = Buffer.concat(chunks);
+          const str = buffer.toString('utf-8');
+          return JSON.parse(str);
+        } else {
+          throw new Error("Buffer is not supported in this environment.");
+        }
       }
     }
 
-    if (Buffer.isBuffer(input)) {
+    if (typeof Buffer !== 'undefined' && Buffer.isBuffer(input)) {
       const str = input.toString('utf-8');
       return JSON.parse(str);
     }
