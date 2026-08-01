@@ -12,6 +12,7 @@ if (!fs.existsSync(outDir)) {
 
 // 1. keywords.json definition
 const keywords = [
+  // 1.0 Core
   {
     keyword: "@context",
     introducedVersion: "1.0",
@@ -165,6 +166,19 @@ const keywords = [
     allowedValues: ["string", "null"],
     containerSupport: [],
     requiresExpansion: true,
+    googleSupport: "ignored",
+    schemaSupport: true
+  },
+  {
+    keyword: "@container",
+    introducedVersion: "1.0",
+    deprecatedVersion: null,
+    removedVersion: null,
+    processingAlgorithm: "Context Processing",
+    aliases: [],
+    allowedValues: ["string", "array"],
+    containerSupport: [],
+    requiresExpansion: false,
     googleSupport: "ignored",
     schemaSupport: true
   },

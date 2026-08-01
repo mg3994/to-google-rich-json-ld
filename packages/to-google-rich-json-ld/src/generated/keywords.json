@@ -192,6 +192,22 @@
     "schemaSupport": true
   },
   {
+    "keyword": "@container",
+    "introducedVersion": "1.0",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Context Processing",
+    "aliases": [],
+    "allowedValues": [
+      "string",
+      "array"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": false,
+    "googleSupport": "ignored",
+    "schemaSupport": true
+  },
+  {
     "keyword": "@version",
     "introducedVersion": "1.1",
     "deprecatedVersion": null,
