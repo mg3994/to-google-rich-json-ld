@@ -117,12 +117,30 @@ describe('GoogleRichJsonLdEngine', () => {
       }
     };
     const converted = await convert(reverseDoc);
-    expect(Array.isArray(converted)).toBe(true);
-    expect(converted[0]["@type"]).toBe("Person");
-    expect(converted[0]["name"]).toBe("Bob");
-    expect(converted[1]["@type"]).toBe("Book");
-    expect(converted[1]["name"]).toBe("Gatsby");
-    expect(converted[1]["author"]["name"]).toBe("Bob");
+    expect(converted["@graph"]).toBeDefined();
+    const graph = converted["@graph"];
+    expect(graph[0]["@type"]).toBe("Person");
+    expect(graph[0]["name"]).toBe("Bob");
+    expect(graph[1]["@type"]).toBe("Book");
+    expect(graph[1]["name"]).toBe("Gatsby");
+    expect(graph[1]["author"]["@id"]).toBeDefined();
+  });
+
+  it('should raise a warning / error when reverse property is semantically invalid (e.g. author on Product)', async () => {
+    const invalidReverseDoc = {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      "name": "Wrench",
+      "@reverse": {
+        "author": {
+          "@type": "Book",
+          "name": "Gatsby"
+        }
+      }
+    };
+    const result = await validate(invalidReverseDoc);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(err => err.includes("Omitted semantically invalid reverse relationship") && err.includes("expects range types"))).toBe(true);
   });
 
   it('should support default standard ontologies offline (e.g. Brick, FOAF, DCT, Bibo)', async () => {

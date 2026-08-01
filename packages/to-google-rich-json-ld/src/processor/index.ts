@@ -89,7 +89,26 @@ export class SemanticProcessor {
 
         for (const [k, v] of Object.entries(node.properties)) {
           const expandedKey = expandIRI(k);
-          properties[expandedKey] = v.map(item => expandNode(item));
+
+          // Support context-specific default language and direction or term overrides
+          const termDef = resolvedContext[k];
+          let termLang: string | null = null;
+          let termDir: string | null = null;
+          if (termDef && typeof termDef === 'object') {
+            termLang = termDef['@language'] || null;
+            termDir = termDef['@direction'] || null;
+          }
+
+          properties[expandedKey] = v.map(item => {
+            if (item.type === "Literal" && typeof item.value === 'string') {
+              const finalLang = termLang || resolvedContext['@language'] || null;
+              const finalDir = termDir || resolvedContext['@direction'] || null;
+              if (finalLang || finalDir) {
+                return new ValueObjectNodeImpl(item.value, finalLang, finalDir, null);
+              }
+            }
+            return expandNode(item);
+          });
         }
 
         return new NodeObjectNodeImpl(id, types, properties);
@@ -97,7 +116,10 @@ export class SemanticProcessor {
 
       if (node.type === "ValueObject") {
         const dataType = node.dataType ? expandIRI(node.dataType) : null;
-        return new ValueObjectNodeImpl(node.value, node.language, node.direction, dataType);
+        // Keep explicit values if defined, otherwise inherit defaults from active context
+        const language = node.language || resolvedContext['@language'] || null;
+        const direction = node.direction || resolvedContext['@direction'] || null;
+        return new ValueObjectNodeImpl(node.value, language, direction, dataType);
       }
 
       if (node.type === "ListObject") {
@@ -188,7 +210,11 @@ export class SemanticProcessor {
 
       if (node.type === "ValueObject") {
         const dataType = node.dataType ? compactIRI(node.dataType) : null;
-        if (!node.language && !node.direction && !dataType) {
+        // If language and direction match target context default, we can compact them out cleanly
+        const matchesTargetLang = node.language === (resolvedContext['@language'] || null);
+        const matchesTargetDir = node.direction === (resolvedContext['@direction'] || null);
+
+        if (matchesTargetLang && matchesTargetDir && !dataType) {
           return new LiteralNodeImpl(node.value);
         }
         return new ValueObjectNodeImpl(node.value, node.language, node.direction, dataType);

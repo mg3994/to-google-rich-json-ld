@@ -28,6 +28,9 @@ export class CompatibilityEngine {
   private plugins: Plugin[] = [];
   private config: Config;
 
+  // Public warnings array to collect and expose semantic mapping warnings
+  public warnings: string[] = [];
+
   constructor(config: Config) {
     this.config = config;
     this.registerDefaultPlugins();
@@ -47,6 +50,7 @@ export class CompatibilityEngine {
    */
   public transform(doc: DocumentNode): DocumentNode {
     let transformedDoc = doc;
+    this.warnings = [];
 
     // Run plug-in transform pipelines
     for (const plugin of this.plugins) {
@@ -189,19 +193,8 @@ export class CompatibilityEngine {
                 if (child.type === "NodeObject") {
                   const childProperties = { ...child.properties };
 
-                  // Retain name and identifier on parent reference to avoid semantic data loss while removing heavy nesting
-                  const parentRefProps: Record<string, ASTNode[]> = {};
-                  if (cleanParentNode.properties["name"]) {
-                    parentRefProps["name"] = cleanParentNode.properties["name"];
-                  }
-                  if (cleanParentNode.properties["https://schema.org/name"]) {
-                    parentRefProps["https://schema.org/name"] = cleanParentNode.properties["https://schema.org/name"];
-                  }
-                  if (cleanParentNode.properties["http://schema.org/name"]) {
-                    parentRefProps["http://schema.org/name"] = cleanParentNode.properties["http://schema.org/name"];
-                  }
-
-                  const parentReference = new NodeObjectNodeImpl(cleanParentNode.id, cleanParentNode.types, parentRefProps);
+                  // OPTION A (Best Practice): Represent parent reference as a pure reference link with ONLY @id (no duplicated type or name!)
+                  const parentReference = new NodeObjectNodeImpl(cleanParentNode.id, [], {});
                   childProperties[propName] = [parentReference];
 
                   const updatedChild = new NodeObjectNodeImpl(child.id, child.types, childProperties);
@@ -211,7 +204,9 @@ export class CompatibilityEngine {
                 }
               }
             } else {
-              console.warn(`Pruned semantically invalid reverse relationship: parent of type(s) [${cleanParentNode.types.join(", ")}] cannot be assigned to property '${propName}' (expects ranges: [${allowedRanges.join(", ")}])`);
+              const warnMsg = `Omitted semantically invalid reverse relationship: parent of type(s) [${cleanParentNode.types.join(", ")}] cannot be assigned to property '${propName}' (expects range types/subtypes: [${allowedRanges.join(", ")}])`;
+              this.warnings.push(warnMsg);
+              console.warn(warnMsg);
             }
           }
         }
@@ -235,8 +230,9 @@ export class CompatibilityEngine {
     }
 
     if (hoistedNodes.length > 0) {
+      // Group all hoisted and main nodes cleanly into a root-level @graph structure (Option A best practice)
       const allNodes = [...mainNodes, ...hoistedNodes];
-      return new DocumentNodeImpl(doc.context, [new SetObjectNodeImpl(allNodes)]);
+      return new DocumentNodeImpl(doc.context, [new GraphObjectNodeImpl(null, allNodes)]);
     }
 
     return new DocumentNodeImpl(doc.context, mainNodes);

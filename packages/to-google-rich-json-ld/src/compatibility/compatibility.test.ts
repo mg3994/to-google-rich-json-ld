@@ -99,14 +99,15 @@ describe('CompatibilityEngine', () => {
     const transformedDoc = engine.transform(doc);
     const serialized = serializer.serialize(transformedDoc);
 
-    // It should flatten to a set containing Person and Book pointing forward to Person
-    expect(Array.isArray(serialized)).toBe(true);
-    expect(serialized[0]["@type"]).toBe("Person");
-    expect(serialized[0]["name"]).toBe("Alice");
-    expect(serialized[1]["@type"]).toBe("Book");
-    expect(serialized[1]["name"]).toBe("Alice in Wonderland");
-    expect(serialized[1]["author"]["@type"]).toBe("Person");
-    expect(serialized[1]["author"]["name"]).toBe("Alice");
+    // It should flatten to a root @graph containing Person and Book pointing forward to Person with pure @id reference
+    expect(serialized["@graph"]).toBeDefined();
+    const graph = serialized["@graph"];
+    expect(graph[0]["@type"]).toBe("Person");
+    expect(graph[0]["name"]).toBe("Alice");
+    expect(graph[1]["@type"]).toBe("Book");
+    expect(graph[1]["name"]).toBe("Alice in Wonderland");
+    expect(graph[1]["author"]["@id"]).toBeDefined();
+    expect(graph[1]["author"]["@type"]).toBeUndefined();
   });
 
   it('should hoist included secondary nodes into graph structures', () => {
@@ -129,10 +130,11 @@ describe('CompatibilityEngine', () => {
     const transformedDoc = engine.transform(doc);
     const serialized = serializer.serialize(transformedDoc);
 
-    expect(Array.isArray(serialized)).toBe(true);
-    expect(serialized.length).toBe(2);
-    expect(serialized[0]["@type"]).toBe("Product");
-    expect(serialized[1]["@type"]).toBe("Review");
+    expect(serialized["@graph"]).toBeDefined();
+    const graph = serialized["@graph"];
+    expect(graph.length).toBe(2);
+    expect(graph[0]["@type"]).toBe("Product");
+    expect(graph[1]["@type"]).toBe("Review");
   });
 
   it('should replace superseded Schema.org terms with their current equivalents', () => {

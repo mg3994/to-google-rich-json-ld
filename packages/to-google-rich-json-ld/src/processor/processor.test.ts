@@ -41,6 +41,43 @@ describe('SemanticProcessor', () => {
     expect(serialized["@context"]).toBeUndefined();
   });
 
+  it('should support default @language and @direction in context expansion and compaction', async () => {
+    const builder = new ASTBuilder();
+    const serializer = new ASTSerializer();
+    const processor = new SemanticProcessor(defaultConfig);
+
+    const raw = {
+      "@context": {
+        "@vocab": "https://schema.org/",
+        "@language": "ar",
+        "@direction": "rtl"
+      },
+      "@type": "Product",
+      "name": "مرحبا"
+    };
+
+    const doc = builder.build(raw);
+    const expandedDoc = await processor.expand(doc);
+    const expandedSerialized = serializer.serialize(expandedDoc);
+
+    // Should expand name to a value object with ar and rtl
+    expect(expandedSerialized["https://schema.org/name"]).toEqual({
+      "@value": "مرحبا",
+      "@language": "ar",
+      "@direction": "rtl"
+    });
+
+    // Compact back
+    const compactedDoc = await processor.compact(expandedDoc, {
+      "@vocab": "https://schema.org/",
+      "@language": "ar",
+      "@direction": "rtl"
+    });
+    const compactedSerialized = serializer.serialize(compactedDoc);
+
+    expect(compactedSerialized["name"]).toBe("مرحبا");
+  });
+
   it('should successfully compact absolute IRIs into local context terms', async () => {
     const builder = new ASTBuilder();
     const serializer = new ASTSerializer();

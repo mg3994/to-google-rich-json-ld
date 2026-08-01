@@ -130,6 +130,14 @@ export class GoogleRichJsonLdEngine implements SemanticEngine {
       const schemaErrors = this.schemaValidator.validate(ast);
       errors.push(...schemaErrors);
 
+      // 3. Compatibility semantic warnings (e.g., pruned reverse relationships)
+      const config = this.mergeConfig();
+      const processor = new SemanticProcessor(config);
+      const expandedAST = await processor.expand(ast);
+      const compatibilityEngine = new CompatibilityEngine(config);
+      compatibilityEngine.transform(expandedAST);
+      errors.push(...compatibilityEngine.warnings);
+
     } catch (err: any) {
       errors.push(`JSON parsing/validation error: ${err.message}`);
     }
