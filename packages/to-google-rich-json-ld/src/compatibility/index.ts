@@ -400,6 +400,91 @@ export class CompatibilityEngine {
             return new NodeObjectNodeImpl(node.id, node.types, properties);
           }
           return node;
+        },
+
+        // 5. Datetime ISO8601 Normalization, Numeric Field Cleaning, and Empty Property Pruning
+        (node: ASTNode, config: Config): ASTNode => {
+          if (config.target === "google" && node.type === "NodeObject") {
+            const properties: Record<string, ASTNode[]> = {};
+            const NUMERIC_PROPERTIES = new Set([
+              "price", "ratingValue", "reviewCount", "lowPrice", "highPrice", "priceMin", "priceMax", "bestRating", "worstRating",
+              "https://schema.org/price", "https://schema.org/ratingValue", "https://schema.org/reviewCount", "https://schema.org/lowPrice", "https://schema.org/highPrice"
+            ]);
+
+            const isDateField = (key: string): boolean => {
+              const localKey = key.replace("https://schema.org/", "").replace("http://schema.org/", "");
+              return localKey.toLowerCase().includes("date") || localKey.toLowerCase().includes("time") || localKey === "availabilityStarts" || localKey === "availabilityEnds";
+            };
+
+            for (const [k, v] of Object.entries(node.properties)) {
+              const cleanedList: ASTNode[] = [];
+              for (const item of v) {
+                // Prune empty string literals
+                if (item.type === "Literal" && item.value === "") {
+                  continue;
+                }
+                if (item.type === "ValueObject" && item.value === "") {
+                  continue;
+                }
+
+                // Datetime ISO8601 Normalization
+                if (isDateField(k)) {
+                  if (item.type === "Literal" && typeof item.value === 'string') {
+                    // Normalize "YYYY-MM-DD HH:MM:SS" -> "YYYY-MM-DDTHH:MM:SS"
+                    const val = item.value.trim();
+                    const dateTimeWithSpaceRegex = /^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})(.*)$/;
+                    if (dateTimeWithSpaceRegex.test(val)) {
+                      const normalized = val.replace(dateTimeWithSpaceRegex, "$1T$2$3");
+                      cleanedList.push(new LiteralNodeImpl(normalized));
+                      continue;
+                    }
+                  }
+                  if (item.type === "ValueObject" && typeof item.value === 'string') {
+                    const val = item.value.trim();
+                    const dateTimeWithSpaceRegex = /^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})(.*)$/;
+                    if (dateTimeWithSpaceRegex.test(val)) {
+                      const normalized = val.replace(dateTimeWithSpaceRegex, "$1T$2$3");
+                      cleanedList.push(new ValueObjectNodeImpl(normalized, item.language, item.direction, item.dataType));
+                      continue;
+                    }
+                  }
+                }
+
+                // Numeric Field Cleaning (e.g. "$1,499.00" -> "1499.00")
+                const localKey = k.replace("https://schema.org/", "").replace("http://schema.org/", "");
+                if (NUMERIC_PROPERTIES.has(localKey) || NUMERIC_PROPERTIES.has(k)) {
+                  if (item.type === "Literal" && typeof item.value === 'string') {
+                    const val = item.value.trim();
+                    // Strip currency symbols and commas (thousands separator)
+                    let cleaned = val.replace(/[$,€,£,¥]/g, '').replace(/,/g, '');
+                    // Convert to float if it matches a valid number pattern, otherwise keep clean string
+                    if (/^-?\d+(?:\.\d+)?$/.test(cleaned)) {
+                      cleanedList.push(new LiteralNodeImpl(parseFloat(cleaned)));
+                    } else {
+                      cleanedList.push(new LiteralNodeImpl(cleaned));
+                    }
+                    continue;
+                  }
+                  if (item.type === "ValueObject" && typeof item.value === 'string') {
+                    const val = item.value.trim();
+                    let cleaned = val.replace(/[$,€,£,¥]/g, '').replace(/,/g, '');
+                    cleanedList.push(new ValueObjectNodeImpl(cleaned, item.language, item.direction, item.dataType));
+                    continue;
+                  }
+                }
+
+                cleanedList.push(item);
+              }
+
+              // Only include the property if it is non-empty
+              if (cleanedList.length > 0) {
+                properties[k] = cleanedList;
+              }
+            }
+
+            return new NodeObjectNodeImpl(node.id, node.types, properties);
+          }
+          return node;
         }
       ]
     };

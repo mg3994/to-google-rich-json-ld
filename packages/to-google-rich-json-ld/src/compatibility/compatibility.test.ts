@@ -154,4 +154,26 @@ describe('CompatibilityEngine', () => {
     expect(serialized["recipeYields"]).toBeUndefined();
     expect(serialized["yield"]).toBe("4 servings");
   });
+
+  it('should normalize datetimes, clean numeric strings, and prune empty values', () => {
+    const builder = new ASTBuilder();
+    const serializer = new ASTSerializer();
+    const engine = new CompatibilityEngine(defaultConfig);
+
+    const doc = builder.build({
+      "@context": "https://schema.org",
+      "@type": "Product",
+      "name": "Widget",
+      "datePublished": "2026-08-01 12:00:00",
+      "price": "$1,499.00",
+      "emptyField": ""
+    });
+
+    const transformedDoc = engine.transform(doc);
+    const serialized = serializer.serialize(transformedDoc);
+
+    expect(serialized["datePublished"]).toBe("2026-08-01T12:00:00");
+    expect(serialized["price"]).toBe(1499.00);
+    expect(serialized["emptyField"]).toBeUndefined();
+  });
 });
