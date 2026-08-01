@@ -11,6 +11,7 @@ import { ASTBuilder } from './ast/index.js';
 import { ASTSerializer } from './serializer/index.js';
 import { SemanticProcessor } from './processor/index.js';
 import { CompatibilityEngine } from './compatibility/index.js';
+import { SchemaValidator } from './validator/index.js';
 
 const defaultConfig: Config = {
   target: "google",
@@ -29,6 +30,7 @@ export class GoogleRichJsonLdEngine implements SemanticEngine {
   private versionDetector = new VersionDetector();
   private astBuilder = new ASTBuilder();
   private serializer = new ASTSerializer();
+  private schemaValidator = new SchemaValidator();
 
   /**
    * Helper to merge user options with default configuration.
@@ -86,7 +88,8 @@ export class GoogleRichJsonLdEngine implements SemanticEngine {
   }
 
   /**
-   * Performs basic JSON-LD syntax checks and Google structured data conformance checks.
+   * Performs basic JSON-LD syntax checks, Google structured data conformance checks,
+   * and deep Schema.org type/property validation using the ingested schema registry.
    */
   public async validate(document: ConvertInput): Promise<{ valid: boolean; errors: string[] }> {
     const errors: string[] = [];
@@ -97,10 +100,10 @@ export class GoogleRichJsonLdEngine implements SemanticEngine {
         return { valid: false, errors };
       }
 
+      // 1. Basic rich results conformance checks
       const traverse = (node: any) => {
         if (!node || typeof node !== 'object') return;
 
-        // Basic rich results checks
         if (node['@type'] === 'Product') {
           if (!node['name']) {
             errors.push("Missing required field 'name' for Product type.");
@@ -120,10 +123,15 @@ export class GoogleRichJsonLdEngine implements SemanticEngine {
           }
         }
       };
-
       traverse(raw);
+
+      // 2. Deep Schema.org type and property validation via AST
+      const ast = this.astBuilder.build(raw);
+      const schemaErrors = this.schemaValidator.validate(ast);
+      errors.push(...schemaErrors);
+
     } catch (err: any) {
-      errors.push(`JSON parsing error: ${err.message}`);
+      errors.push(`JSON parsing/validation error: ${err.message}`);
     }
 
     return {
@@ -169,7 +177,7 @@ export class GoogleRichJsonLdEngine implements SemanticEngine {
   }
 
   /**
-   * Programmatic Framing API.
+   * Programmatic Flattening API.
    */
   public async frame(document: ConvertInput, frameSpec: any, options?: Partial<Config>): Promise<RawDocument> {
     const config = this.mergeConfig(options);
@@ -229,8 +237,7 @@ export class GoogleRichJsonLdEngine implements SemanticEngine {
       for (const [k, v] of Object.entries(node)) {
         if (k.startsWith('@')) {
           keywordsUsed.add(k);
-          // Check if unknown
-          const isKnown = k === '@context' || k === '@type' || k === '@id' || k === '@value' || k === '@language' || k === '@graph' || k === '@list' || k === '@set' || k === '@reverse' || k === '@index' || k === '@base' || k === '@vocab' || k === '@version' || k === '@direction' || k === '@import' || k === '@included' || k === '@json' || k === '@nest' || k === '@none' || k === '@prefix' || k === '@propagate' || k === '@protected';
+          const isKnown = k === '@context' || k === '@type' || k === '@id' || k === '@value' || k === '@language' || k === '@graph' || k === '@list' || k === '@set' || k === '@reverse' || k === '@index' || k === '@base' || k === '@vocab' || k === '@version' || k === '@direction' || k === '@import' || k === '@included' || k === '@json' || k === '@nest' || k === '@none' || k === '@prefix' || k === '@propagate' || k === '@protected' || k === '@container';
           if (!isKnown) {
             unknownKeywords.add(k);
           }
@@ -251,7 +258,7 @@ export class GoogleRichJsonLdEngine implements SemanticEngine {
   }
 }
 
-// Export a default helper instance and static functions
+// Export default helper instance and static functions
 const engine = new GoogleRichJsonLdEngine();
 
 export const convert = (doc: ConvertInput, options?: Partial<Config>) => engine.convert(doc, options);
