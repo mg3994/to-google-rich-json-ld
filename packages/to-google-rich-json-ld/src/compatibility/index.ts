@@ -475,7 +475,7 @@ export class CompatibilityEngine {
 
         // 5. Datetime ISO8601 Normalization, Numeric Field Cleaning, Empty Property Pruning,
         // Auto-wrapping of lists, Nested Type Inference, Relative URL Expansion, Rating Normalization, SameAs securing,
-        // Singularization / Pluralization property term normalization, and Structural Value Deduplication.
+        // Singularization / Pluralization, White-space normalization, and Structural Value Deduplication.
         (node: ASTNode, config: Config, base?: string): ASTNode => {
           if (config.target === "google" && node.type === "NodeObject") {
             const properties: Record<string, ASTNode[]> = {};
@@ -498,6 +498,10 @@ export class CompatibilityEngine {
               "founders": "founder",
               "employees": "employee"
             };
+            const TEXT_NORMALIZATION_PROPERTIES = new Set([
+              "name", "headline", "sku", "mpn", "telephone", "email",
+              "https://schema.org/name", "https://schema.org/headline", "https://schema.org/sku", "https://schema.org/mpn", "https://schema.org/telephone", "https://schema.org/email"
+            ]);
 
             const isDateField = (key: string): boolean => {
               const localKey = key.replace("https://schema.org/", "").replace("http://schema.org/", "");
@@ -520,6 +524,10 @@ export class CompatibilityEngine {
             const isRatingType = updatedTypes.some(t => {
               const localType = t.replace("https://schema.org/", "").replace("http://schema.org/", "");
               return localType === "Rating" || localType === "AggregateRating";
+            });
+            const isAggregateRatingType = updatedTypes.some(t => {
+              const localType = t.replace("https://schema.org/", "").replace("http://schema.org/", "");
+              return localType === "AggregateRating";
             });
 
             for (let [k, v] of Object.entries(node.properties)) {
@@ -651,12 +659,29 @@ export class CompatibilityEngine {
                   }
                 }
 
-                // Relative URL Value Expansion using @base & sameAs social URL protocol securing
+                // Telephone and text field whitespace / trailing space / tab normalization
+                if (TEXT_NORMALIZATION_PROPERTIES.has(k)) {
+                  if (item.type === "Literal" && typeof item.value === 'string') {
+                    const val = item.value.replace(/\s+/g, ' ').trim();
+                    cleanedList.push(new LiteralNodeImpl(val));
+                    continue;
+                  }
+                  if (item.type === "ValueObject" && typeof item.value === 'string') {
+                    const val = item.value.replace(/\s+/g, ' ').trim();
+                    cleanedList.push(new ValueObjectNodeImpl(val, item.language, item.direction, item.dataType));
+                    continue;
+                  }
+                }
+
+                // Relative URL Value Expansion & Protocol-relative URL securing using @base
                 if (URL_PROPERTIES.has(k)) {
                   const isSameAsProp = k === "sameAs" || k === "https://schema.org/sameAs";
 
                   if (item.type === "Literal" && typeof item.value === 'string') {
                     let val = item.value.trim();
+                    if (val.startsWith("//")) {
+                      val = "https:" + val;
+                    }
                     if (isSameAsProp && val.startsWith("http://")) {
                       const lower = val.toLowerCase();
                       const domains = ["twitter.com", "x.com", "facebook.com", "instagram.com", "linkedin.com", "youtube.com", "wikipedia.org"];
@@ -678,6 +703,9 @@ export class CompatibilityEngine {
 
                   if (item.type === "ValueObject" && typeof item.value === 'string') {
                     let val = item.value.trim();
+                    if (val.startsWith("//")) {
+                      val = "https:" + val;
+                    }
                     if (isSameAsProp && val.startsWith("http://")) {
                       const lower = val.toLowerCase();
                       const domains = ["twitter.com", "x.com", "facebook.com", "instagram.com", "linkedin.com", "youtube.com", "wikipedia.org"];
@@ -715,7 +743,7 @@ export class CompatibilityEngine {
               }
             }
 
-            // Auto-inject missing bestRating/worstRating if ratingValue exists
+            // Auto-inject missing bestRating/worstRating/ratingCount if ratingValue exists
             if (isRatingType) {
               const ratingValueKey = "ratingValue" in properties ? "ratingValue" : ("https://schema.org/ratingValue" in properties ? "https://schema.org/ratingValue" : "");
               if (ratingValueKey) {
@@ -729,6 +757,15 @@ export class CompatibilityEngine {
                 }
                 if (!hasWorst) {
                   properties[worstKey] = [new LiteralNodeImpl(1)];
+                }
+
+                if (isAggregateRatingType) {
+                  const hasRatingCount = "ratingCount" in properties || "https://schema.org/ratingCount" in properties;
+                  const hasReviewCount = "reviewCount" in properties || "https://schema.org/reviewCount" in properties;
+                  if (!hasRatingCount && !hasReviewCount) {
+                    const ratingCountKey = ratingValueKey.replace(/[a-zA-Z0-9]+$/, "") + "ratingCount";
+                    properties[ratingCountKey] = [new LiteralNodeImpl(1)];
+                  }
                 }
               }
             }

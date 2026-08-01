@@ -321,4 +321,25 @@ describe('CompatibilityEngine', () => {
     expect(serialized["review"]).toBeDefined();
     expect(serialized["review"]["reviewBody"]).toBe("Loved it.");
   });
+
+  it('should normalize spaces/telephones, secure protocol-relative URLs, and inject AggregateRating fallback', () => {
+    const builder = new ASTBuilder();
+    const serializer = new ASTSerializer();
+    const engine = new CompatibilityEngine(defaultConfig);
+
+    const doc = builder.build({
+      "@context": "https://schema.org",
+      "@type": "AggregateRating",
+      "name": " \n\t  Ultimate Gaming   Laptop  \n ", // messy spaces
+      "image": "//example.com/logo.png", // protocol relative URL
+      "ratingValue": "4.8" // should inject ratingCount: 1 because count/review are missing
+    });
+
+    const transformedDoc = engine.transform(doc);
+    const serialized = serializer.serialize(transformedDoc);
+
+    expect(serialized["name"]).toBe("Ultimate Gaming Laptop");
+    expect(serialized["image"]).toBe("https://example.com/logo.png");
+    expect(serialized["ratingCount"]).toBe(1);
+  });
 });
