@@ -1,0 +1,34 @@
+{
+  "matrix": {
+    "@graph": {
+      "Google": "supported",
+      "Schema": "supported",
+      "JSONLD": "supported"
+    },
+    "@reverse": {
+      "Google": "transformed",
+      "Schema": "supported",
+      "JSONLD": "supported"
+    },
+    "@included": {
+      "Google": "transformed",
+      "Schema": "supported",
+      "JSONLD": "supported"
+    },
+    "@nest": {
+      "Google": "ignored",
+      "Schema": "ignored",
+      "JSONLD": "supported"
+    },
+    "@index": {
+      "Google": "ignored",
+      "Schema": "ignored",
+      "JSONLD": "supported"
+    },
+    "@protected": {
+      "Google": "ignored",
+      "Schema": "ignored",
+      "JSONLD": "supported"
+    }
+  }
+}

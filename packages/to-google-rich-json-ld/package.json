@@ -1,0 +1,26 @@
+{
+  "name": "to-google-rich-json-ld",
+  "version": "1.0.0",
+  "description": "Transform any JSON-LD document into a Google Rich Results compatible JSON-LD document",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "to-google-rich-json-ld": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "crawl": "node --experimental-strip-types scripts/crawl-jsonld-specs.ts",
+    "generate": "node --experimental-strip-types scripts/generate-metadata.ts"
+  },
+  "dependencies": {
+    "commander": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.1"
+  }
+}

@@ -1,0 +1,422 @@
+[
+  {
+    "keyword": "@context",
+    "introducedVersion": "1.0",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Context Processing",
+    "aliases": [],
+    "allowedValues": [
+      "string",
+      "object",
+      "array"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": true,
+    "googleSupport": "supported",
+    "schemaSupport": true
+  },
+  {
+    "keyword": "@id",
+    "introducedVersion": "1.0",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "IRI Expansion",
+    "aliases": [],
+    "allowedValues": [
+      "string"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": true,
+    "googleSupport": "supported",
+    "schemaSupport": true
+  },
+  {
+    "keyword": "@type",
+    "introducedVersion": "1.0",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Value Expansion",
+    "aliases": [],
+    "allowedValues": [
+      "string",
+      "array"
+    ],
+    "containerSupport": [
+      "@set",
+      "@sort"
+    ],
+    "requiresExpansion": true,
+    "googleSupport": "supported",
+    "schemaSupport": true
+  },
+  {
+    "keyword": "@value",
+    "introducedVersion": "1.0",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Value Expansion",
+    "aliases": [],
+    "allowedValues": [
+      "string",
+      "number",
+      "boolean",
+      "null"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": true,
+    "googleSupport": "supported",
+    "schemaSupport": true
+  },
+  {
+    "keyword": "@language",
+    "introducedVersion": "1.0",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Value Expansion",
+    "aliases": [],
+    "allowedValues": [
+      "string"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": true,
+    "googleSupport": "supported",
+    "schemaSupport": true
+  },
+  {
+    "keyword": "@graph",
+    "introducedVersion": "1.0",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Flattening / Expansion",
+    "aliases": [],
+    "allowedValues": [
+      "object",
+      "array"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": true,
+    "googleSupport": "supported",
+    "schemaSupport": true
+  },
+  {
+    "keyword": "@list",
+    "introducedVersion": "1.0",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "List Processing",
+    "aliases": [],
+    "allowedValues": [
+      "array"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": true,
+    "googleSupport": "supported",
+    "schemaSupport": true
+  },
+  {
+    "keyword": "@set",
+    "introducedVersion": "1.0",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Set Processing",
+    "aliases": [],
+    "allowedValues": [
+      "array"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": true,
+    "googleSupport": "supported",
+    "schemaSupport": true
+  },
+  {
+    "keyword": "@reverse",
+    "introducedVersion": "1.0",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Reverse Property Processing",
+    "aliases": [],
+    "allowedValues": [
+      "object"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": true,
+    "googleSupport": "transformed",
+    "schemaSupport": true
+  },
+  {
+    "keyword": "@index",
+    "introducedVersion": "1.0",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Value Expansion",
+    "aliases": [],
+    "allowedValues": [
+      "string"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": true,
+    "googleSupport": "ignored",
+    "schemaSupport": true
+  },
+  {
+    "keyword": "@base",
+    "introducedVersion": "1.0",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "IRI Expansion",
+    "aliases": [],
+    "allowedValues": [
+      "string",
+      "null"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": true,
+    "googleSupport": "ignored",
+    "schemaSupport": true
+  },
+  {
+    "keyword": "@vocab",
+    "introducedVersion": "1.0",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "IRI Expansion",
+    "aliases": [],
+    "allowedValues": [
+      "string",
+      "null"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": true,
+    "googleSupport": "ignored",
+    "schemaSupport": true
+  },
+  {
+    "keyword": "@version",
+    "introducedVersion": "1.1",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Context Processing",
+    "aliases": [],
+    "allowedValues": [
+      "number",
+      "string"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": false,
+    "googleSupport": "ignored",
+    "schemaSupport": true
+  },
+  {
+    "keyword": "@direction",
+    "introducedVersion": "1.1",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Value Expansion",
+    "aliases": [],
+    "allowedValues": [
+      "string"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": true,
+    "googleSupport": "ignored",
+    "schemaSupport": true
+  },
+  {
+    "keyword": "@import",
+    "introducedVersion": "1.1",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Context Processing",
+    "aliases": [],
+    "allowedValues": [
+      "string"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": false,
+    "googleSupport": "transformed",
+    "schemaSupport": true
+  },
+  {
+    "keyword": "@included",
+    "introducedVersion": "1.1",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Included Processing",
+    "aliases": [],
+    "allowedValues": [
+      "array",
+      "object"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": true,
+    "googleSupport": "transformed",
+    "schemaSupport": true
+  },
+  {
+    "keyword": "@json",
+    "introducedVersion": "1.1",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Value Expansion",
+    "aliases": [],
+    "allowedValues": [
+      "any"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": true,
+    "googleSupport": "ignored",
+    "schemaSupport": true
+  },
+  {
+    "keyword": "@nest",
+    "introducedVersion": "1.1",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Nested Property Processing",
+    "aliases": [],
+    "allowedValues": [
+      "object",
+      "array"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": true,
+    "googleSupport": "transformed",
+    "schemaSupport": true
+  },
+  {
+    "keyword": "@none",
+    "introducedVersion": "1.1",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Value Expansion",
+    "aliases": [],
+    "allowedValues": [
+      "string"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": true,
+    "googleSupport": "ignored",
+    "schemaSupport": true
+  },
+  {
+    "keyword": "@prefix",
+    "introducedVersion": "1.1",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Context Processing",
+    "aliases": [],
+    "allowedValues": [
+      "boolean"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": false,
+    "googleSupport": "ignored",
+    "schemaSupport": true
+  },
+  {
+    "keyword": "@propagate",
+    "introducedVersion": "1.1",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Context Processing",
+    "aliases": [],
+    "allowedValues": [
+      "boolean"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": false,
+    "googleSupport": "ignored",
+    "schemaSupport": true
+  },
+  {
+    "keyword": "@protected",
+    "introducedVersion": "1.1",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Context Processing",
+    "aliases": [],
+    "allowedValues": [
+      "boolean"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": false,
+    "googleSupport": "ignored",
+    "schemaSupport": true
+  },
+  {
+    "keyword": "@default",
+    "introducedVersion": "1.0",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Framing",
+    "aliases": [],
+    "allowedValues": [
+      "any"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": false,
+    "googleSupport": "unsupported",
+    "schemaSupport": false
+  },
+  {
+    "keyword": "@embed",
+    "introducedVersion": "1.0",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Framing",
+    "aliases": [],
+    "allowedValues": [
+      "string"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": false,
+    "googleSupport": "unsupported",
+    "schemaSupport": false
+  },
+  {
+    "keyword": "@explicit",
+    "introducedVersion": "1.0",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Framing",
+    "aliases": [],
+    "allowedValues": [
+      "boolean"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": false,
+    "googleSupport": "unsupported",
+    "schemaSupport": false
+  },
+  {
+    "keyword": "@omitDefault",
+    "introducedVersion": "1.0",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Framing",
+    "aliases": [],
+    "allowedValues": [
+      "boolean"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": false,
+    "googleSupport": "unsupported",
+    "schemaSupport": false
+  },
+  {
+    "keyword": "@requireAll",
+    "introducedVersion": "1.0",
+    "deprecatedVersion": null,
+    "removedVersion": null,
+    "processingAlgorithm": "Framing",
+    "aliases": [],
+    "allowedValues": [
+      "boolean"
+    ],
+    "containerSupport": [],
+    "requiresExpansion": false,
+    "googleSupport": "unsupported",
+    "schemaSupport": false
+  }
+]

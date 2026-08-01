@@ -1,0 +1,418 @@
+{
+  "version": "26.0",
+  "types": {
+    "Thing": {
+      "parent": null,
+      "properties": [
+        "name",
+        "url",
+        "image",
+        "description",
+        "sameAs",
+        "identifier",
+        "alternateName"
+      ]
+    },
+    "Product": {
+      "parent": "Thing",
+      "properties": [
+        "offers",
+        "brand",
+        "review",
+        "aggregateRating",
+        "sku",
+        "gtin",
+        "mpn",
+        "color"
+      ]
+    },
+    "Offer": {
+      "parent": "Thing",
+      "properties": [
+        "price",
+        "priceCurrency",
+        "availability",
+        "itemCondition",
+        "seller",
+        "validFrom"
+      ]
+    },
+    "AggregateRating": {
+      "parent": "Thing",
+      "properties": [
+        "ratingValue",
+        "bestRating",
+        "worstRating",
+        "ratingCount",
+        "reviewCount"
+      ]
+    },
+    "Review": {
+      "parent": "Thing",
+      "properties": [
+        "reviewRating",
+        "author",
+        "itemReviewed",
+        "reviewBody",
+        "publisher"
+      ]
+    },
+    "Organization": {
+      "parent": "Thing",
+      "properties": [
+        "logo",
+        "address",
+        "telephone",
+        "member",
+        "founder",
+        "email"
+      ]
+    },
+    "Person": {
+      "parent": "Thing",
+      "properties": [
+        "givenName",
+        "familyName",
+        "address",
+        "telephone",
+        "email",
+        "jobTitle",
+        "worksFor"
+      ]
+    },
+    "Place": {
+      "parent": "Thing",
+      "properties": [
+        "address",
+        "geo",
+        "telephone"
+      ]
+    },
+    "PostalAddress": {
+      "parent": "ContactPoint",
+      "properties": [
+        "streetAddress",
+        "addressLocality",
+        "addressRegion",
+        "postalCode",
+        "addressCountry"
+      ]
+    },
+    "ContactPoint": {
+      "parent": "Thing",
+      "properties": [
+        "telephone",
+        "contactType",
+        "email",
+        "areaServed"
+      ]
+    },
+    "BreadcrumbList": {
+      "parent": "ItemList",
+      "properties": [
+        "itemListElement"
+      ]
+    },
+    "ItemList": {
+      "parent": "Thing",
+      "properties": [
+        "itemListElement",
+        "numberOfItems",
+        "itemListOrder"
+      ]
+    },
+    "ListItem": {
+      "parent": "Thing",
+      "properties": [
+        "item",
+        "position",
+        "nextItem",
+        "previousItem"
+      ]
+    },
+    "Article": {
+      "parent": "CreativeWork",
+      "properties": [
+        "headline",
+        "articleBody",
+        "author",
+        "datePublished",
+        "dateModified",
+        "publisher"
+      ]
+    },
+    "CreativeWork": {
+      "parent": "Thing",
+      "properties": [
+        "headline",
+        "author",
+        "publisher",
+        "datePublished",
+        "dateModified",
+        "about"
+      ]
+    },
+    "Recipe": {
+      "parent": "HowTo",
+      "properties": [
+        "recipeIngredient",
+        "recipeInstructions",
+        "cookTime",
+        "prepTime",
+        "nutrition",
+        "yield"
+      ]
+    },
+    "HowTo": {
+      "parent": "CreativeWork",
+      "properties": [
+        "steps",
+        "estimatedCost",
+        "tool",
+        "supply"
+      ]
+    },
+    "LocalBusiness": {
+      "parent": "Organization",
+      "properties": [
+        "openingHours",
+        "priceRange",
+        "geo",
+        "currenciesAccepted"
+      ]
+    },
+    "FAQPage": {
+      "parent": "CreativeWork",
+      "properties": [
+        "mainEntity"
+      ]
+    },
+    "Question": {
+      "parent": "Thing",
+      "properties": [
+        "name",
+        "acceptedAnswer",
+        "suggestedAnswer"
+      ]
+    },
+    "Answer": {
+      "parent": "Thing",
+      "properties": [
+        "text",
+        "upvoteCount"
+      ]
+    }
+  },
+  "properties": {
+    "name": {
+      "domain": [
+        "Thing"
+      ],
+      "range": [
+        "Text"
+      ]
+    },
+    "url": {
+      "domain": [
+        "Thing"
+      ],
+      "range": [
+        "URL"
+      ]
+    },
+    "image": {
+      "domain": [
+        "Thing"
+      ],
+      "range": [
+        "URL",
+        "ImageObject"
+      ]
+    },
+    "description": {
+      "domain": [
+        "Thing"
+      ],
+      "range": [
+        "Text"
+      ]
+    },
+    "sameAs": {
+      "domain": [
+        "Thing"
+      ],
+      "range": [
+        "URL"
+      ]
+    },
+    "identifier": {
+      "domain": [
+        "Thing"
+      ],
+      "range": [
+        "PropertyValue",
+        "Text",
+        "URL"
+      ]
+    },
+    "alternateName": {
+      "domain": [
+        "Thing"
+      ],
+      "range": [
+        "Text"
+      ]
+    },
+    "offers": {
+      "domain": [
+        "Product"
+      ],
+      "range": [
+        "Offer",
+        "AggregateOffer"
+      ]
+    },
+    "brand": {
+      "domain": [
+        "Product"
+      ],
+      "range": [
+        "Brand",
+        "Organization"
+      ]
+    },
+    "review": {
+      "domain": [
+        "Product"
+      ],
+      "range": [
+        "Review"
+      ]
+    },
+    "aggregateRating": {
+      "domain": [
+        "Product",
+        "LocalBusiness"
+      ],
+      "range": [
+        "AggregateRating"
+      ]
+    },
+    "sku": {
+      "domain": [
+        "Product"
+      ],
+      "range": [
+        "Text"
+      ]
+    },
+    "price": {
+      "domain": [
+        "Offer"
+      ],
+      "range": [
+        "Number",
+        "Text"
+      ]
+    },
+    "priceCurrency": {
+      "domain": [
+        "Offer"
+      ],
+      "range": [
+        "Text"
+      ]
+    },
+    "ratingValue": {
+      "domain": [
+        "AggregateRating",
+        "Rating"
+      ],
+      "range": [
+        "Number",
+        "Text"
+      ]
+    },
+    "ratingCount": {
+      "domain": [
+        "AggregateRating"
+      ],
+      "range": [
+        "Integer"
+      ]
+    },
+    "itemListElement": {
+      "domain": [
+        "ItemList"
+      ],
+      "range": [
+        "ListItem",
+        "Thing",
+        "Text"
+      ]
+    },
+    "item": {
+      "domain": [
+        "ListItem"
+      ],
+      "range": [
+        "Thing"
+      ]
+    },
+    "position": {
+      "domain": [
+        "ListItem"
+      ],
+      "range": [
+        "Integer",
+        "Text"
+      ]
+    },
+    "recipeIngredient": {
+      "domain": [
+        "Recipe"
+      ],
+      "range": [
+        "Text"
+      ]
+    },
+    "recipeInstructions": {
+      "domain": [
+        "Recipe"
+      ],
+      "range": [
+        "CreativeWork",
+        "ItemList",
+        "Text"
+      ]
+    },
+    "mainEntity": {
+      "domain": [
+        "FAQPage"
+      ],
+      "range": [
+        "Question"
+      ]
+    },
+    "acceptedAnswer": {
+      "domain": [
+        "Question"
+      ],
+      "range": [
+        "Answer"
+      ]
+    },
+    "text": {
+      "domain": [
+        "Answer"
+      ],
+      "range": [
+        "Text"
+      ]
+    }
+  },
+  "superseded": {
+    "recipeYields": "yield",
+    "seller": "vendor"
+  }
+}

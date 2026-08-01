@@ -1,0 +1,14 @@
+{
+  "1.0": {
+    "specUrl": "https://www.w3.org/TR/json-ld/",
+    "status": "W3C Recommendation"
+  },
+  "1.1": {
+    "specUrl": "https://www.w3.org/TR/json-ld11/",
+    "status": "W3C Recommendation"
+  },
+  "1.2": {
+    "specUrl": "https://json-ld.org/spec/latest/json-ld-syntax/",
+    "status": "Editor Draft"
+  }
+}

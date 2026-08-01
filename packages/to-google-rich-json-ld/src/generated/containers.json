@@ -1,0 +1,26 @@
+{
+  "@list": {
+    "support": "supported",
+    "googleAction": "retained"
+  },
+  "@set": {
+    "support": "supported",
+    "googleAction": "retained"
+  },
+  "@language": {
+    "support": "supported",
+    "googleAction": "retained"
+  },
+  "@index": {
+    "support": "ignored",
+    "googleAction": "pruned"
+  },
+  "@id": {
+    "support": "supported",
+    "googleAction": "retained"
+  },
+  "@type": {
+    "support": "supported",
+    "googleAction": "retained"
+  }
+}

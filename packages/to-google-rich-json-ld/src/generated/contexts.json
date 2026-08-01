@@ -1,0 +1,24 @@
+{
+  "known": {
+    "https://schema.org": {
+      "secure": true,
+      "type": "Schema.org"
+    },
+    "http://schema.org": {
+      "secure": false,
+      "type": "Schema.org"
+    },
+    "https://schema.org/": {
+      "secure": true,
+      "type": "Schema.org"
+    },
+    "http://schema.org/": {
+      "secure": false,
+      "type": "Schema.org"
+    }
+  },
+  "mappings": {
+    "http://schema.org": "https://schema.org",
+    "http://schema.org/": "https://schema.org"
+  }
+}

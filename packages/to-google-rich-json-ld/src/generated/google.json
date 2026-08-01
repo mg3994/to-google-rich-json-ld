@@ -1,0 +1,19 @@
+{
+  "target": "google",
+  "supportedRichResults": [
+    "Product",
+    "BreadcrumbList",
+    "FAQPage",
+    "Recipe",
+    "Article",
+    "LocalBusiness",
+    "Organization"
+  ],
+  "rules": {
+    "simplifySingleNodeGraph": true,
+    "flattenReverseProperties": true,
+    "hoistIncludedNodes": true,
+    "stripIgnoredKeywords": true,
+    "canonicalizeSchemaOrgIri": true
+  }
+}

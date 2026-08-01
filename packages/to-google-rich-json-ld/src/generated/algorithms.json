@@ -1,0 +1,47 @@
+{
+  "Expansion": {
+    "description": "Recursively expands all context terms into absolute IRIs and wraps values in value objects.",
+    "parameters": [
+      "document",
+      "context",
+      "options"
+    ],
+    "googleStatus": "supported"
+  },
+  "Compaction": {
+    "description": "Transforms an expanded document into a more compact form using a specific context.",
+    "parameters": [
+      "document",
+      "context",
+      "options"
+    ],
+    "googleStatus": "supported"
+  },
+  "Flattening": {
+    "description": "Flattens nested JSON-LD trees into a single-level array of node objects with forward references.",
+    "parameters": [
+      "document",
+      "context",
+      "options"
+    ],
+    "googleStatus": "supported"
+  },
+  "Framing": {
+    "description": "Structures a JSON-LD document based on a template or 'frame'.",
+    "parameters": [
+      "document",
+      "frame",
+      "options"
+    ],
+    "googleStatus": "ignored"
+  },
+  "Context Processing": {
+    "description": "Parses, merges, and dereferences @context values.",
+    "parameters": [
+      "activeContext",
+      "localContext",
+      "remoteContexts"
+    ],
+    "googleStatus": "supported"
+  }
+}
