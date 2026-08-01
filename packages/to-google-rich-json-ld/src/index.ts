@@ -79,7 +79,11 @@ export class GoogleRichJsonLdEngine implements SemanticEngine {
 
     let targetContext: any = "https://schema.org";
     if (Object.keys(defaults).length > 0) {
-      targetContext = ["https://schema.org", defaults];
+      // Use a flat, unified context object instead of an array for cleaner search parser digestion
+      targetContext = {
+        "@vocab": "https://schema.org/",
+        ...defaults
+      };
     }
 
     // Compact back to target Schema.org context (incorporating base/language defaults)
@@ -113,7 +117,10 @@ export class GoogleRichJsonLdEngine implements SemanticEngine {
 
     let targetContext: any = "https://schema.org";
     if (Object.keys(defaults).length > 0) {
-      targetContext = ["https://schema.org", defaults];
+      targetContext = {
+        "@vocab": "https://schema.org/",
+        ...defaults
+      };
     }
 
     const compacted = await processor.compact(expanded, targetContext);
