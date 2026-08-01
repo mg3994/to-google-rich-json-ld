@@ -125,7 +125,6 @@ export class CompatibilityEngine {
             hasReverse = true;
             reverseNode = v[0] as ReverseObjectNode;
           } else {
-            // Recursively clean and process properties
             cleanProperties[k] = v.map(walkAndExtract);
           }
         }
@@ -139,14 +138,14 @@ export class CompatibilityEngine {
           });
         }
 
-        // Extract and process @reverse (translate reverse to forward relationship on the nested child)
+        // Extract and process @reverse
         if (hasReverse && reverseNode) {
           for (const [propName, childNodes] of Object.entries(reverseNode.properties)) {
             for (const child of childNodes) {
               if (child.type === "NodeObject") {
-                // Build a child node where the forward property points to our parent node
                 const childProperties = { ...child.properties };
-                childProperties[propName] = [parentNode];
+                const cleanParent = new NodeObjectNodeImpl(node.id, node.types, cleanProperties);
+                childProperties[propName] = [cleanParent];
                 const updatedChild = new NodeObjectNodeImpl(child.id, child.types, childProperties);
                 hoistedNodes.push(walkAndExtract(updatedChild));
               } else {
@@ -170,14 +169,11 @@ export class CompatibilityEngine {
       return node;
     };
 
-    // Walk all top-level document body nodes
     for (const item of doc.body) {
       mainNodes.push(walkAndExtract(item));
     }
 
     if (hoistedNodes.length > 0) {
-      // If we have hoisted nodes, group all main and hoisted nodes cleanly into a root-level Set
-      // which serializes to a clean, non-corrupted flat JSON-LD array that Google structured data prefers!
       const allNodes = [...mainNodes, ...hoistedNodes];
       return new DocumentNodeImpl(doc.context, [new SetObjectNodeImpl(allNodes)]);
     }
@@ -231,11 +227,34 @@ export class CompatibilityEngine {
           return node;
         },
 
-        // 2. Normalize and Secure Schema.org IRI schemas: http -> https
+        // 2. Normalize and Secure Schema.org IRI schemas & Enum URLs: http -> https
         (node: ASTNode, config: Config): ASTNode => {
           if (node.type === "Context" && typeof node.value === 'string') {
             if (node.value.startsWith("http://schema.org")) {
               return new ContextNodeImpl(node.value.replace("http://schema.org", "https://schema.org"));
+            }
+          }
+
+          if (config.target === "google") {
+            // Secure types and IDs in NodeObjects
+            if (node.type === "NodeObject") {
+              const types = node.types.map(t => t.startsWith("http://schema.org") ? t.replace("http://schema.org", "https://schema.org") : t);
+              const id = node.id && node.id.startsWith("http://schema.org") ? node.id.replace("http://schema.org", "https://schema.org") : node.id;
+              return new NodeObjectNodeImpl(id, types, node.properties);
+            }
+
+            // Secure enum values inside ValueObjects
+            if (node.type === "ValueObject") {
+              const dataType = node.dataType && node.dataType.startsWith("http://schema.org") ? node.dataType.replace("http://schema.org", "https://schema.org") : node.dataType;
+              const value = typeof node.value === 'string' && node.value.startsWith("http://schema.org") ? node.value.replace("http://schema.org", "https://schema.org") : node.value;
+              return new ValueObjectNodeImpl(value, node.language, node.direction, dataType);
+            }
+
+            // Secure enum values inside LiteralNodes
+            if (node.type === "Literal" && typeof node.value === 'string') {
+              if (node.value.startsWith("http://schema.org")) {
+                return new LiteralNodeImpl(node.value.replace("http://schema.org", "https://schema.org"));
+              }
             }
           }
           return node;

@@ -150,9 +150,20 @@ export class SemanticProcessor {
       if (reverseMappings[iri]) {
         return reverseMappings[iri];
       }
+
+      // Prioritize @vocab compacting first (e.g. "https://schema.org/Offer" -> "Offer")
       if (vocab && iri.startsWith(vocab)) {
         return iri.slice(vocab.length);
       }
+
+      // Contraction check for standard prefix ontologies (e.g. "http://xmlns.com/foaf/0.1/name" -> "foaf:name")
+      for (const [prefix, ns] of Object.entries(resolvedContext)) {
+        if (prefix.startsWith('@')) continue;
+        if (typeof ns === 'string' && iri.startsWith(ns) && iri !== ns) {
+          return prefix + ":" + iri.slice(ns.length);
+        }
+      }
+
       return iri;
     };
 

@@ -26,6 +26,7 @@ import {
 import keywordsJson from '../generated/keywords.json' with { type: 'json' };
 
 const KNOWN_KEYWORDS = new Set(keywordsJson.map(k => k.keyword));
+const BCP47_REGEXP = /^[a-z]{2,3}(-[a-zA-Z0-9]{2,8})*$/;
 
 // Concrete AST node implementations
 export class DocumentNodeImpl implements DocumentNode {
@@ -163,7 +164,6 @@ export class ASTBuilder {
     let contextNode: ContextNode | null = null;
     const body: ASTNode[] = [];
 
-    // Extract root-level context if present in object
     if (typeof doc === 'object' && doc !== null && !Array.isArray(doc)) {
       if ('@context' in doc) {
         contextNode = new ContextNodeImpl(doc['@context']);
@@ -180,13 +180,27 @@ export class ASTBuilder {
     return new DocumentNodeImpl(contextNode, body);
   }
 
+  private isLanguageMap(val: any): boolean {
+    if (val === null || typeof val !== 'object' || Array.isArray(val)) return false;
+    const keys = Object.keys(val);
+    if (keys.length === 0) return false;
+    for (const k of keys) {
+      // Validate key is a standard BCP47 language tag
+      if (!BCP47_REGEXP.test(k)) return false;
+      const v = val[k];
+      if (typeof v !== 'string' && (!Array.isArray(v) || v.some(x => typeof x !== 'string'))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   private parseNode(val: any): ASTNode {
     if (val === null || typeof val !== 'object') {
       return new LiteralNodeImpl(val);
     }
 
     if (Array.isArray(val)) {
-      // Unordered set/array mapping
       return new SetObjectNodeImpl(val.map(item => this.parseNode(item)));
     }
 
@@ -213,6 +227,15 @@ export class ASTBuilder {
         val['@id'] || null,
         items.map(item => this.parseNode(item))
       );
+    }
+
+    // Check if it's a Language Map
+    if (this.isLanguageMap(val)) {
+      const map: Record<string, string[]> = {};
+      for (const [k, v] of Object.entries(val)) {
+        map[k] = Array.isArray(v) ? v.map(String) : [String(v)];
+      }
+      return new LanguageMapNodeImpl(map);
     }
 
     // Build NodeObject

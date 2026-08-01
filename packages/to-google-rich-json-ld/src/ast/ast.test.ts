@@ -74,4 +74,26 @@ describe('ASTBuilder', () => {
       expect(reverseProp[0].type).toBe("ReverseObject");
     }
   });
+
+  it('should successfully parse language maps into LanguageMapNode', () => {
+    const builder = new ASTBuilder();
+    const raw = {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      "name": {
+        "en": "Apple",
+        "fr": "Pomme"
+      }
+    };
+    const doc = builder.build(raw);
+    const rootNode = doc.body[0];
+    if (rootNode.type === "NodeObject") {
+      const nameProp = rootNode.properties["name"][0];
+      expect(nameProp.type).toBe("LanguageMap");
+      if (nameProp.type === "LanguageMap") {
+        expect(nameProp.map["en"]).toContain("Apple");
+        expect(nameProp.map["fr"]).toContain("Pomme");
+      }
+    }
+  });
 });

@@ -124,4 +124,35 @@ describe('GoogleRichJsonLdEngine', () => {
     expect(converted[1]["name"]).toBe("Gatsby");
     expect(converted[1]["author"]["name"]).toBe("Bob");
   });
+
+  it('should support default standard ontologies offline (e.g. Brick, FOAF, DCT, Bibo)', async () => {
+    const brickDoc = {
+      "@type": "brick:Location",
+      "dct:title": "Building 1",
+      "foaf:name": "HQ"
+    };
+
+    const expanded = await expand(brickDoc);
+    expect(expanded["@type"]).toContain("https://brickschema.org/schema/Brick#Location");
+    expect(expanded["http://purl.org/dc/terms/title"]).toBe("Building 1");
+    expect(expanded["http://xmlns.com/foaf/0.1/name"]).toBe("HQ");
+
+    const compacted = await compact(expanded, {});
+    expect(compacted["@type"]).toBe("brick:Location");
+    expect(compacted["dct:title"]).toBe("Building 1");
+    expect(compacted["foaf:name"]).toBe("HQ");
+  });
+
+  it('should secure and canonicalize insecure Schema.org enum values', async () => {
+    const itemWithEnum = {
+      "@context": "http://schema.org",
+      "@type": "Offer",
+      "availability": "http://schema.org/InStock",
+      "itemCondition": "http://schema.org/NewCondition"
+    };
+
+    const converted = await convert(itemWithEnum);
+    expect(converted["availability"]).toBe("https://schema.org/InStock");
+    expect(converted["itemCondition"]).toBe("https://schema.org/NewCondition");
+  });
 });
