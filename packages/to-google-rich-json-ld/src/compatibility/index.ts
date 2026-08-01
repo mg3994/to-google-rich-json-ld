@@ -127,8 +127,8 @@ export class CompatibilityEngine {
 
     const walkAndExtract = (node: ASTNode): ASTNode => {
       if (node.type === "NodeObject") {
-        const nodeId = node.id || getNextBlankNodeId();
-        const nodeWithId = new NodeObjectNodeImpl(nodeId, node.types, node.properties);
+        const nodeId = node.id || null;
+        const parentNode = new NodeObjectNodeImpl(nodeId, node.types, node.properties);
 
         const cleanProperties: Record<string, ASTNode[]> = {};
         let hasIncluded = false;
@@ -148,7 +148,13 @@ export class CompatibilityEngine {
           }
         }
 
-        const parentNode = new NodeObjectNodeImpl(nodeId, node.types, cleanProperties);
+        // Only assign a blank node ID if it's referenced and doesn't already have one
+        let activeNodeId = nodeId;
+        if (!activeNodeId && hasReverse) {
+          activeNodeId = getNextBlankNodeId();
+        }
+
+        const cleanParentNode = new NodeObjectNodeImpl(activeNodeId, node.types, cleanProperties);
 
         // Process @included
         if (hasIncluded && includedNode) {
@@ -166,10 +172,10 @@ export class CompatibilityEngine {
 
             // Check if our parent node's type matches the allowed ranges for this property
             let isSemanticallyValid = false;
-            if (parentNode.types.length === 0) {
+            if (cleanParentNode.types.length === 0) {
               isSemanticallyValid = true; // allow if parent type is unknown
             } else {
-              for (const parentTypeIRI of parentNode.types) {
+              for (const parentTypeIRI of cleanParentNode.types) {
                 const parentTypeName = parentTypeIRI.replace("https://schema.org/", "").replace("http://schema.org/", "");
                 if (isTypeInAllowedRange(parentTypeName, allowedRanges)) {
                   isSemanticallyValid = true;
@@ -185,17 +191,17 @@ export class CompatibilityEngine {
 
                   // Retain name and identifier on parent reference to avoid semantic data loss while removing heavy nesting
                   const parentRefProps: Record<string, ASTNode[]> = {};
-                  if (parentNode.properties["name"]) {
-                    parentRefProps["name"] = parentNode.properties["name"];
+                  if (cleanParentNode.properties["name"]) {
+                    parentRefProps["name"] = cleanParentNode.properties["name"];
                   }
-                  if (parentNode.properties["https://schema.org/name"]) {
-                    parentRefProps["https://schema.org/name"] = parentNode.properties["https://schema.org/name"];
+                  if (cleanParentNode.properties["https://schema.org/name"]) {
+                    parentRefProps["https://schema.org/name"] = cleanParentNode.properties["https://schema.org/name"];
                   }
-                  if (parentNode.properties["http://schema.org/name"]) {
-                    parentRefProps["http://schema.org/name"] = parentNode.properties["http://schema.org/name"];
+                  if (cleanParentNode.properties["http://schema.org/name"]) {
+                    parentRefProps["http://schema.org/name"] = cleanParentNode.properties["http://schema.org/name"];
                   }
 
-                  const parentReference = new NodeObjectNodeImpl(parentNode.id, parentNode.types, parentRefProps);
+                  const parentReference = new NodeObjectNodeImpl(cleanParentNode.id, cleanParentNode.types, parentRefProps);
                   childProperties[propName] = [parentReference];
 
                   const updatedChild = new NodeObjectNodeImpl(child.id, child.types, childProperties);
@@ -205,12 +211,12 @@ export class CompatibilityEngine {
                 }
               }
             } else {
-              console.warn(`Pruned semantically invalid reverse relationship: parent of type(s) [${parentNode.types.join(", ")}] cannot be assigned to property '${propName}' (expects ranges: [${allowedRanges.join(", ")}])`);
+              console.warn(`Pruned semantically invalid reverse relationship: parent of type(s) [${cleanParentNode.types.join(", ")}] cannot be assigned to property '${propName}' (expects ranges: [${allowedRanges.join(", ")}])`);
             }
           }
         }
 
-        return parentNode;
+        return cleanParentNode;
       }
 
       if (node.type === "GraphObject") {
