@@ -145,7 +145,11 @@ describe('CompatibilityEngine', () => {
     const doc = builder.build({
       "@context": "https://schema.org",
       "@type": "Recipe",
-      "recipeYields": "4 servings"
+      "recipeYields": "4 servings",
+      "vendor": {
+        "@type": "Organization",
+        "name": "BestStore"
+      }
     });
 
     const transformedDoc = engine.transform(doc);
@@ -153,6 +157,10 @@ describe('CompatibilityEngine', () => {
 
     expect(serialized["recipeYields"]).toBeUndefined();
     expect(serialized["yield"]).toBe("4 servings");
+
+    // legacy "vendor" is mapped to modern canonical "seller"
+    expect(serialized["vendor"]).toBeUndefined();
+    expect(serialized["seller"]["name"]).toBe("BestStore");
   });
 
   it('should normalize datetimes, clean numeric strings, and prune empty values', () => {
@@ -254,5 +262,34 @@ describe('CompatibilityEngine', () => {
     // Duplicated offers should be structurally deduplicated to just 1 offer item
     expect(Array.isArray(serialized["offers"])).toBe(false);
     expect(serialized["offers"]["price"]).toBe(10);
+  });
+
+  it('should auto-inject best/worst rating limits, normalize ratingValue, and secure sameAs links', () => {
+    const builder = new ASTBuilder();
+    const serializer = new ASTSerializer();
+    const engine = new CompatibilityEngine(defaultConfig);
+
+    const doc = builder.build({
+      "@context": "https://schema.org",
+      "@type": "AggregateRating",
+      "ratingValue": "4,5", // commas should be replaced by dots
+      "sameAs": [
+        "http://twitter.com/mybrand", // insecure social link
+        "https://twitter.com/mybrand", // duplicate secure social link
+        "https://example.com"
+      ]
+    });
+
+    const transformedDoc = engine.transform(doc);
+    const serialized = serializer.serialize(transformedDoc);
+
+    expect(serialized["ratingValue"]).toBe(4.5);
+    expect(serialized["bestRating"]).toBe(5);
+    expect(serialized["worstRating"]).toBe(1);
+
+    // sameAs URLs are protocol secured and deduplicated
+    expect(serialized["sameAs"].length).toBe(2);
+    expect(serialized["sameAs"]).toContain("https://twitter.com/mybrand");
+    expect(serialized["sameAs"]).toContain("https://example.com");
   });
 });

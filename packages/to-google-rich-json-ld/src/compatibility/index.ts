@@ -313,7 +313,13 @@ export class CompatibilityEngine {
         (node: ASTNode, config: Config): ASTNode => {
           if (node.type === "NodeObject") {
             const properties: Record<string, ASTNode[]> = {};
-            const supersededRecord = schemaMetadata.superseded as Record<string, string>;
+            const supersededRecord = {
+              ...schemaMetadata.superseded,
+              "vendor": "seller", // Cleanly map superseded vendor property to seller
+              "https://schema.org/vendor": "https://schema.org/seller",
+              "http://schema.org/vendor": "https://schema.org/seller"
+            } as Record<string, string>;
+
             for (const [k, v] of Object.entries(node.properties)) {
               let finalKey = k;
               if (supersededRecord[k]) {
@@ -468,7 +474,7 @@ export class CompatibilityEngine {
         },
 
         // 5. Datetime ISO8601 Normalization, Numeric Field Cleaning, Empty Property Pruning,
-        // Auto-wrapping of lists, Nested Type Inference, Relative URL Expansion, and Structural Value Deduplication.
+        // Auto-wrapping of lists, Nested Type Inference, Relative URL Expansion, Rating Normalization, SameAs securing, and Structural Value Deduplication.
         (node: ASTNode, config: Config, base?: string): ASTNode => {
           if (config.target === "google" && node.type === "NodeObject") {
             const properties: Record<string, ASTNode[]> = {};
@@ -502,6 +508,11 @@ export class CompatibilityEngine {
                 updatedTypes.push("https://schema.org/Offer");
               }
             }
+
+            const isRatingType = updatedTypes.some(t => {
+              const localType = t.replace("https://schema.org/", "").replace("http://schema.org/", "");
+              return localType === "Rating" || localType === "AggregateRating";
+            });
 
             for (const [k, v] of Object.entries(node.properties)) {
               // Auto-wrap itemListElement and recipeInstructions into @list containers
@@ -555,11 +566,14 @@ export class CompatibilityEngine {
                   }
                 }
 
-                // Numeric Field Cleaning (e.g. "$1,499.00" -> "1499.00")
+                // Numeric Field Cleaning (e.g. "$1,499.00" -> "1499.00") and Rating String Normalization
                 const localKey = k.replace("https://schema.org/", "").replace("http://schema.org/", "");
                 if (NUMERIC_PROPERTIES.has(localKey) || NUMERIC_PROPERTIES.has(k)) {
                   if (item.type === "Literal" && typeof item.value === 'string') {
-                    const val = item.value.trim();
+                    let val = item.value.trim();
+                    if (localKey === "ratingValue" || localKey === "bestRating" || localKey === "worstRating") {
+                      val = val.replace(/,/g, '.');
+                    }
                     // Strip currency symbols and commas (thousands separator)
                     let cleaned = val.replace(/[$,€,£,¥]/g, '').replace(/,/g, '');
                     // Convert to float if it matches a valid number pattern, otherwise keep clean string
@@ -571,38 +585,60 @@ export class CompatibilityEngine {
                     continue;
                   }
                   if (item.type === "ValueObject" && typeof item.value === 'string') {
-                    const val = item.value.trim();
+                    let val = item.value.trim();
+                    if (localKey === "ratingValue" || localKey === "bestRating" || localKey === "worstRating") {
+                      val = val.replace(/,/g, '.');
+                    }
                     let cleaned = val.replace(/[$,€,£,¥]/g, '').replace(/,/g, '');
                     cleanedList.push(new ValueObjectNodeImpl(cleaned, item.language, item.direction, item.dataType));
                     continue;
                   }
                 }
 
-                // Relative URL Value Expansion using @base
-                if (URL_PROPERTIES.has(k) && base) {
+                // Relative URL Value Expansion using @base & sameAs social URL protocol securing
+                if (URL_PROPERTIES.has(k)) {
+                  const isSameAsProp = k === "sameAs" || k === "https://schema.org/sameAs";
+
                   if (item.type === "Literal" && typeof item.value === 'string') {
-                    const val = item.value.trim();
-                    if (!val.includes("://") && !val.startsWith("data:") && !val.startsWith("mailto:") && !val.startsWith("tel:")) {
+                    let val = item.value.trim();
+                    if (isSameAsProp && val.startsWith("http://")) {
+                      const lower = val.toLowerCase();
+                      const domains = ["twitter.com", "x.com", "facebook.com", "instagram.com", "linkedin.com", "youtube.com", "wikipedia.org"];
+                      if (domains.some(d => lower.includes("://" + d) || lower.includes("://www." + d))) {
+                        val = val.replace(/^http:\/\//i, "https:////").replace("https:////", "https://");
+                      }
+                    }
+
+                    if (base && !val.includes("://") && !val.startsWith("data:") && !val.startsWith("mailto:") && !val.startsWith("tel:")) {
                       try {
-                        const absUrl = new URL(val, base).toString();
-                        cleanedList.push(new LiteralNodeImpl(absUrl));
-                        continue;
+                        val = new URL(val, base).toString();
                       } catch {
                         // fallback
                       }
                     }
+                    cleanedList.push(new LiteralNodeImpl(val));
+                    continue;
                   }
+
                   if (item.type === "ValueObject" && typeof item.value === 'string') {
-                    const val = item.value.trim();
-                    if (!val.includes("://") && !val.startsWith("data:") && !val.startsWith("mailto:") && !val.startsWith("tel:")) {
+                    let val = item.value.trim();
+                    if (isSameAsProp && val.startsWith("http://")) {
+                      const lower = val.toLowerCase();
+                      const domains = ["twitter.com", "x.com", "facebook.com", "instagram.com", "linkedin.com", "youtube.com", "wikipedia.org"];
+                      if (domains.some(d => lower.includes("://" + d) || lower.includes("://www." + d))) {
+                        val = val.replace(/^http:\/\//i, "https:////").replace("https:////", "https://");
+                      }
+                    }
+
+                    if (base && !val.includes("://") && !val.startsWith("data:") && !val.startsWith("mailto:") && !val.startsWith("tel:")) {
                       try {
-                        const absUrl = new URL(val, base).toString();
-                        cleanedList.push(new ValueObjectNodeImpl(absUrl, item.language, item.direction, item.dataType));
-                        continue;
+                        val = new URL(val, base).toString();
                       } catch {
                         // fallback
                       }
                     }
+                    cleanedList.push(new ValueObjectNodeImpl(val, item.language, item.direction, item.dataType));
+                    continue;
                   }
                 }
 
@@ -620,6 +656,24 @@ export class CompatibilityEngine {
               // Only include the property if it is non-empty
               if (deduplicatedList.length > 0) {
                 properties[k] = deduplicatedList;
+              }
+            }
+
+            // Auto-inject missing bestRating/worstRating if ratingValue exists
+            if (isRatingType) {
+              const ratingValueKey = "ratingValue" in properties ? "ratingValue" : ("https://schema.org/ratingValue" in properties ? "https://schema.org/ratingValue" : "");
+              if (ratingValueKey) {
+                const bestKey = ratingValueKey.replace(/[a-zA-Z0-9]+$/, "") + "bestRating";
+                const worstKey = ratingValueKey.replace(/[a-zA-Z0-9]+$/, "") + "worstRating";
+                const hasBest = bestKey in properties || "https://schema.org/bestRating" in properties || "bestRating" in properties;
+                const hasWorst = worstKey in properties || "https://schema.org/worstRating" in properties || "worstRating" in properties;
+
+                if (!hasBest) {
+                  properties[bestKey] = [new LiteralNodeImpl(5)];
+                }
+                if (!hasWorst) {
+                  properties[worstKey] = [new LiteralNodeImpl(1)];
+                }
               }
             }
 
