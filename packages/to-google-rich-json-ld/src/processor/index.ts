@@ -40,6 +40,7 @@ export class SemanticProcessor {
     const rawContext = customCtx || (doc.context ? doc.context.value : null);
     const resolvedContext = await this.contextLoader.load(rawContext);
     const vocab = resolvedContext['@vocab'] || '';
+    const base = resolvedContext['@base'] || '';
 
     const expandIRI = (term: string): string => {
       if (term.startsWith('@')) return term;
@@ -70,9 +71,19 @@ export class SemanticProcessor {
         return resolved;
       }
 
-      // Secure check: do NOT append vocab to absolute IRIs or blank node identifiers!
+      // Secure check: do NOT append vocab/base to absolute IRIs or blank node identifiers!
       if (term.startsWith('http://') || term.startsWith('https://') || term.startsWith('_:') || term.startsWith('urn:')) {
         return term;
+      }
+
+      // Resolve relative IRI with @base if specified
+      if (base) {
+        try {
+          const absoluteUrl = new URL(term, base).toString();
+          return absoluteUrl;
+        } catch {
+          return base + term;
+        }
       }
 
       if (vocab) {
@@ -161,6 +172,7 @@ export class SemanticProcessor {
   public async compact(doc: DocumentNode, targetCtx: any): Promise<DocumentNode> {
     const resolvedContext = await this.contextLoader.load(targetCtx);
     const vocab = resolvedContext['@vocab'] || '';
+    const base = resolvedContext['@base'] || '';
 
     const reverseMappings: Record<string, string> = {};
     for (const [k, v] of Object.entries(resolvedContext)) {
@@ -176,6 +188,11 @@ export class SemanticProcessor {
       if (iri.startsWith('@')) return iri;
       if (reverseMappings[iri]) {
         return reverseMappings[iri];
+      }
+
+      // Compact with @base if present
+      if (base && iri.startsWith(base)) {
+        return iri.slice(base.length);
       }
 
       // Prioritize @vocab compacting first (e.g. "https://schema.org/Offer" -> "Offer")

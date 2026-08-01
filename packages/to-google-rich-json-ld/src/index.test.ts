@@ -104,6 +104,27 @@ describe('GoogleRichJsonLdEngine', () => {
     expect(expanded["https://schema.org/name"]).toBe("Bob");
   });
 
+  it('should preserve and merge @base defaults when converting relative IDs', async () => {
+    const relativeDoc = {
+      "@context": {
+        "@base": "https://example.com/"
+      },
+      "@id": "products/123",
+      "@type": "https://schema.org/Product",
+      "https://schema.org/name": "Laptop"
+    };
+
+    const converted = await convert(relativeDoc);
+
+    // Final output should maintain @context as an array preserving @base, and @id as compacted relative ID "products/123"
+    expect(converted["@id"]).toBe("products/123");
+    expect(converted["@context"]).toContain("https://schema.org");
+    const baseContext = converted["@context"].find((c: any) => typeof c === 'object' && c['@base']);
+    expect(baseContext).toBeDefined();
+    expect(baseContext["@base"]).toBe("https://example.com/");
+    expect(converted["name"]).toBe("Laptop");
+  });
+
   it('should cleanly hoist @reverse properties without corrupting parent semantics', async () => {
     const reverseDoc = {
       "@context": "https://schema.org",

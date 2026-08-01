@@ -25,6 +25,22 @@ const defaultConfig: Config = {
   strict: false
 };
 
+function extractContextDefaults(ctx: any): Record<string, any> {
+  const defaults: Record<string, any> = {};
+  if (!ctx) return defaults;
+
+  if (Array.isArray(ctx)) {
+    for (const item of ctx) {
+      Object.assign(defaults, extractContextDefaults(item));
+    }
+  } else if (typeof ctx === 'object' && ctx !== null) {
+    if ('@base' in ctx) defaults['@base'] = ctx['@base'];
+    if ('@language' in ctx) defaults['@language'] = ctx['@language'];
+    if ('@direction' in ctx) defaults['@direction'] = ctx['@direction'];
+  }
+  return defaults;
+}
+
 export class GoogleRichJsonLdEngine implements SemanticEngine {
   private parser = new Parser();
   private versionDetector = new VersionDetector();
@@ -57,8 +73,17 @@ export class GoogleRichJsonLdEngine implements SemanticEngine {
     const compatibilityEngine = new CompatibilityEngine(config);
     const transformedAST = compatibilityEngine.transform(expandedAST);
 
-    // Compact back to target Schema.org context (defaulting to https://schema.org)
-    const compactedAST = await processor.compact(transformedAST, "https://schema.org");
+    // Extract default context values (@base, @language, @direction) to preserve them
+    const originalCtxValue = ast.context ? ast.context.value : null;
+    const defaults = extractContextDefaults(originalCtxValue);
+
+    let targetContext: any = "https://schema.org";
+    if (Object.keys(defaults).length > 0) {
+      targetContext = ["https://schema.org", defaults];
+    }
+
+    // Compact back to target Schema.org context (incorporating base/language defaults)
+    const compactedAST = await processor.compact(transformedAST, targetContext);
 
     // Serialize back to raw JSON object
     return this.serializer.serialize(compactedAST);
@@ -82,7 +107,16 @@ export class GoogleRichJsonLdEngine implements SemanticEngine {
     const ast = this.astBuilder.build(raw);
     const processor = new SemanticProcessor(config);
     const expanded = await processor.expand(ast);
-    const compacted = await processor.compact(expanded, "https://schema.org");
+
+    const originalCtxValue = ast.context ? ast.context.value : null;
+    const defaults = extractContextDefaults(originalCtxValue);
+
+    let targetContext: any = "https://schema.org";
+    if (Object.keys(defaults).length > 0) {
+      targetContext = ["https://schema.org", defaults];
+    }
+
+    const compacted = await processor.compact(expanded, targetContext);
 
     return this.serializer.serialize(compacted);
   }
