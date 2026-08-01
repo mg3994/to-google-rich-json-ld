@@ -176,4 +176,51 @@ describe('CompatibilityEngine', () => {
     expect(serialized["price"]).toBe(1499.00);
     expect(serialized["emptyField"]).toBeUndefined();
   });
+
+  it('should auto-wrap lists, infer missing types, and expand relative url values using @base', () => {
+    const builder = new ASTBuilder();
+    const serializer = new ASTSerializer();
+    const engine = new CompatibilityEngine(defaultConfig);
+
+    const doc = builder.build({
+      "@context": {
+        "@vocab": "https://schema.org/",
+        "@base": "https://example.com/"
+      },
+      "@type": "Recipe",
+      "name": "Cake",
+      "image": "/images/cake.jpg",
+      "recipeInstructions": [
+        "Mix everything",
+        "Bake at 350F"
+      ],
+      "offers": {
+        "price": "10.00" // untyped Offer
+      },
+      "author": {
+        "name": "Chef James" // untyped Person
+      }
+    });
+
+    const transformedDoc = engine.transform(doc);
+    const serialized = serializer.serialize(transformedDoc);
+
+    // Image relative value should be expanded to absolute using @base
+    expect(serialized["image"]).toBe("https://example.com/images/cake.jpg");
+
+    // recipeInstructions should be auto-wrapped in standard @list container
+    expect(serialized["recipeInstructions"]).toEqual({
+      "@list": [
+        "Mix everything",
+        "Bake at 350F"
+      ]
+    });
+
+    // untyped nested Offer should be auto-inferred
+    expect(serialized["offers"]["@type"]).toBe("https://schema.org/Offer");
+
+    // untyped nested author should be auto-inferred as Person
+    expect(serialized["author"]["@type"]).toBe("https://schema.org/Person");
+    expect(serialized["author"]["name"]).toBe("Chef James");
+  });
 });

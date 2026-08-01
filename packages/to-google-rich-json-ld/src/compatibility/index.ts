@@ -18,11 +18,28 @@ import {
   ValueObjectNodeImpl,
   GraphObjectNodeImpl,
   SetObjectNodeImpl,
-  LiteralNodeImpl
+  LiteralNodeImpl,
+  ListObjectNodeImpl
 } from '../ast/index.js';
 
 import keywordsMetadata from '../generated/keywords.json' with { type: 'json' };
 import schemaMetadata from '../generated/schema.json' with { type: 'json' };
+
+function extractContextDefaults(ctx: any): Record<string, any> {
+  const defaults: Record<string, any> = {};
+  if (!ctx) return defaults;
+
+  if (Array.isArray(ctx)) {
+    for (const item of ctx) {
+      Object.assign(defaults, extractContextDefaults(item));
+    }
+  } else if (typeof ctx === 'object' && ctx !== null) {
+    if ('@base' in ctx) defaults['@base'] = ctx['@base'];
+    if ('@language' in ctx) defaults['@language'] = ctx['@language'];
+    if ('@direction' in ctx) defaults['@direction'] = ctx['@direction'];
+  }
+  return defaults;
+}
 
 export class CompatibilityEngine {
   private plugins: Plugin[] = [];
@@ -52,11 +69,15 @@ export class CompatibilityEngine {
     let transformedDoc = doc;
     this.warnings = [];
 
+    // Extract default context values (@base) to allow relative URL expansions in properties
+    const defaults = extractContextDefaults(doc.context ? doc.context.value : null);
+    const base = defaults['@base'] || '';
+
     // Run plug-in transform pipelines
     for (const plugin of this.plugins) {
       if (plugin.transforms) {
         for (const transformFn of plugin.transforms) {
-          transformedDoc = this.transformDocumentWithFn(transformedDoc, transformFn);
+          transformedDoc = this.transformDocumentWithFn(transformedDoc, transformFn, base);
         }
       }
     }
@@ -71,10 +92,11 @@ export class CompatibilityEngine {
 
   private transformDocumentWithFn(
     doc: DocumentNode,
-    fn: (node: ASTNode, config: Config) => ASTNode
+    fn: (node: ASTNode, config: Config, base?: string) => ASTNode,
+    base: string
   ): DocumentNode {
     const transformNode = (node: ASTNode): ASTNode => {
-      let updatedNode = fn(node, this.config);
+      let updatedNode = fn(node, this.config, base);
 
       if (updatedNode.type === "NodeObject") {
         const properties: Record<string, ASTNode[]> = {};
@@ -402,13 +424,22 @@ export class CompatibilityEngine {
           return node;
         },
 
-        // 5. Datetime ISO8601 Normalization, Numeric Field Cleaning, and Empty Property Pruning
-        (node: ASTNode, config: Config): ASTNode => {
+        // 5. Datetime ISO8601 Normalization, Numeric Field Cleaning, Empty Property Pruning,
+        // Auto-wrapping of lists, Nested Type Inference, and Relative URL Expansion using @base.
+        (node: ASTNode, config: Config, base?: string): ASTNode => {
           if (config.target === "google" && node.type === "NodeObject") {
             const properties: Record<string, ASTNode[]> = {};
             const NUMERIC_PROPERTIES = new Set([
               "price", "ratingValue", "reviewCount", "lowPrice", "highPrice", "priceMin", "priceMax", "bestRating", "worstRating",
               "https://schema.org/price", "https://schema.org/ratingValue", "https://schema.org/reviewCount", "https://schema.org/lowPrice", "https://schema.org/highPrice"
+            ]);
+            const URL_PROPERTIES = new Set([
+              "image", "logo", "url", "sameAs", "hasPart", "partOf", "itemReviewed",
+              "https://schema.org/image", "https://schema.org/logo", "https://schema.org/url", "https://schema.org/sameAs"
+            ]);
+            const LIST_PROPERTIES = new Set([
+              "itemListElement", "recipeInstructions",
+              "https://schema.org/itemListElement", "https://schema.org/recipeInstructions"
             ]);
 
             const isDateField = (key: string): boolean => {
@@ -416,14 +447,45 @@ export class CompatibilityEngine {
               return localKey.toLowerCase().includes("date") || localKey.toLowerCase().includes("time") || localKey === "availabilityStarts" || localKey === "availabilityEnds";
             };
 
+            // Dynamic nested type inference
+            let updatedTypes = [...node.types];
+            if (updatedTypes.length === 0) {
+              const keys = Object.keys(node.properties);
+              const isOfferClue = keys.some(key => {
+                const localKey = key.replace("https://schema.org/", "").replace("http://schema.org/", "");
+                return localKey === "price" || localKey === "priceCurrency" || localKey === "lowPrice" || localKey === "highPrice";
+              });
+              if (isOfferClue) {
+                updatedTypes.push("https://schema.org/Offer");
+              }
+            }
+
             for (const [k, v] of Object.entries(node.properties)) {
+              // Auto-wrap itemListElement and recipeInstructions into @list containers
+              if (LIST_PROPERTIES.has(k) && v.length > 0) {
+                if (v.length === 1 && v[0].type === "ListObject") {
+                  properties[k] = v;
+                } else {
+                  properties[k] = [new ListObjectNodeImpl(v)];
+                }
+                continue;
+              }
+
               const cleanedList: ASTNode[] = [];
+              const isAuthorProp = k === "author" || k === "https://schema.org/author";
+
               for (const item of v) {
                 // Prune empty string literals
                 if (item.type === "Literal" && item.value === "") {
                   continue;
                 }
                 if (item.type === "ValueObject" && item.value === "") {
+                  continue;
+                }
+
+                // Nested Type Inference for Author sub-objects
+                if (isAuthorProp && item.type === "NodeObject" && item.types.length === 0) {
+                  cleanedList.push(new NodeObjectNodeImpl(item.id, ["https://schema.org/Person"], item.properties));
                   continue;
                 }
 
@@ -473,6 +535,34 @@ export class CompatibilityEngine {
                   }
                 }
 
+                // Relative URL Value Expansion using @base
+                if (URL_PROPERTIES.has(k) && base) {
+                  if (item.type === "Literal" && typeof item.value === 'string') {
+                    const val = item.value.trim();
+                    if (!val.includes("://") && !val.startsWith("data:") && !val.startsWith("mailto:") && !val.startsWith("tel:")) {
+                      try {
+                        const absUrl = new URL(val, base).toString();
+                        cleanedList.push(new LiteralNodeImpl(absUrl));
+                        continue;
+                      } catch {
+                        // fallback
+                      }
+                    }
+                  }
+                  if (item.type === "ValueObject" && typeof item.value === 'string') {
+                    const val = item.value.trim();
+                    if (!val.includes("://") && !val.startsWith("data:") && !val.startsWith("mailto:") && !val.startsWith("tel:")) {
+                      try {
+                        const absUrl = new URL(val, base).toString();
+                        cleanedList.push(new ValueObjectNodeImpl(absUrl, item.language, item.direction, item.dataType));
+                        continue;
+                      } catch {
+                        // fallback
+                      }
+                    }
+                  }
+                }
+
                 cleanedList.push(item);
               }
 
@@ -482,7 +572,7 @@ export class CompatibilityEngine {
               }
             }
 
-            return new NodeObjectNodeImpl(node.id, node.types, properties);
+            return new NodeObjectNodeImpl(node.id, updatedTypes, properties);
           }
           return node;
         }
