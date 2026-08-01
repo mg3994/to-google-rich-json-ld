@@ -260,7 +260,41 @@ export class CompatibilityEngine {
           return node;
         },
 
-        // 3. Strip unknown/experimental keywords & nested features ignored by Google
+        // 3. Canonicalize and Secure Schema.org Enum values (e.g. "InStock" -> "https://schema.org/InStock")
+        (node: ASTNode, config: Config): ASTNode => {
+          if (config.target === "google" && node.type === "NodeObject") {
+            const properties: Record<string, ASTNode[]> = {};
+            const ENUM_PROPERTIES = new Set(["availability", "itemCondition", "dayOfWeek", "bookFormat", "paymentStatus", "contactType"]);
+            const KNOWN_ENUM_VALUES = new Set([
+              "InStock", "OutOfStock", "PreOrder", "InStoreOnly", "OnlineOnly", "Discontinued", "LimitedAvailability", "SoldOut",
+              "NewCondition", "UsedCondition", "RefurbishedCondition", "DamagedCondition",
+              "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+              "Hardcover", "Paperback", "EBook", "Audiobook"
+            ]);
+
+            for (const [k, v] of Object.entries(node.properties)) {
+              properties[k] = v.map(item => {
+                if (item.type === "Literal" && typeof item.value === 'string') {
+                  const valStr = item.value;
+                  if (KNOWN_ENUM_VALUES.has(valStr) || (ENUM_PROPERTIES.has(k) && !valStr.includes(":"))) {
+                    return new LiteralNodeImpl("https://schema.org/" + valStr);
+                  }
+                }
+                if (item.type === "ValueObject" && typeof item.value === 'string') {
+                  const valStr = item.value;
+                  if (KNOWN_ENUM_VALUES.has(valStr) || (ENUM_PROPERTIES.has(k) && !valStr.includes(":"))) {
+                    return new ValueObjectNodeImpl("https://schema.org/" + valStr, item.language, item.direction, item.dataType);
+                  }
+                }
+                return item;
+              });
+            }
+            return new NodeObjectNodeImpl(node.id, node.types, properties);
+          }
+          return node;
+        },
+
+        // 4. Strip unknown/experimental keywords & nested features ignored by Google
         // and hoist @nest nested properties to parent.
         (node: ASTNode, config: Config): ASTNode => {
           if (config.target === "google" && node.type === "NodeObject") {

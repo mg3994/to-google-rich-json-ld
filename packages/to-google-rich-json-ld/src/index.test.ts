@@ -147,7 +147,7 @@ describe('GoogleRichJsonLdEngine', () => {
     const itemWithEnum = {
       "@context": "http://schema.org",
       "@type": "Offer",
-      "availability": "http://schema.org/InStock",
+      "availability": "InStock",
       "itemCondition": "http://schema.org/NewCondition"
     };
 
