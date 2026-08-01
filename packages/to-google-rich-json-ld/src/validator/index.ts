@@ -50,14 +50,34 @@ export class SchemaValidator {
             }
           } else if (this.types[typeName]) {
             const validProperties = this.getAllPropertiesForType(typeName);
-            for (const propName of Object.keys(n.properties)) {
+            for (const [propName, propValues] of Object.entries(n.properties)) {
               if (propName.startsWith("@")) continue;
-              const propLocalName = propName.replace("https://schema.org/", "");
+              const propLocalName = propName.replace("https://schema.org/", "").replace("http://schema.org/", "");
 
               if (!validProperties.has(propLocalName)) {
                 if (propName.startsWith("https://schema.org/") || !propName.includes(":")) {
                   errors.push(`Property '${propName}' is not valid for Schema.org type '${typeIRI}'`);
                 }
+              }
+
+              // Datetime property timezone validation (e.g. for datePublished, dateModified)
+              if (propLocalName.toLowerCase().includes("date")) {
+                propValues.forEach(valNode => {
+                  let strVal: string | null = null;
+                  if (valNode.type === "Literal" && typeof valNode.value === 'string') {
+                    strVal = valNode.value;
+                  } else if (valNode.type === "ValueObject" && typeof valNode.value === 'string') {
+                    strVal = valNode.value;
+                  }
+
+                  if (strVal && strVal.includes("T")) {
+                    // Check if it includes a timezone designator: ends with Z, or matches standard timezone offset regex
+                    const hasTimezone = strVal.endsWith("Z") || /[+-]\d{2}:?\d{2}$/.test(strVal);
+                    if (!hasTimezone) {
+                      errors.push(`Datetime property '${propLocalName}' is missing a time zone (optional, but highly recommended by Google)`);
+                    }
+                  }
+                });
               }
             }
           }

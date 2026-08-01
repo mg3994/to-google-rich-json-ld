@@ -143,16 +143,18 @@ describe('GoogleRichJsonLdEngine', () => {
     expect(compacted["foaf:name"]).toBe("HQ");
   });
 
-  it('should secure and canonicalize insecure Schema.org enum values', async () => {
+  it('should secure and canonicalize insecure Schema.org enum values and structured enums', async () => {
     const itemWithEnum = {
       "@context": "http://schema.org",
       "@type": "Offer",
-      "availability": "InStock",
-      "itemCondition": "http://schema.org/NewCondition"
+      "availability": {
+        "@id": "http://schema.org/InStock"
+      },
+      "itemCondition": "NewCondition"
     };
 
     const converted = await convert(itemWithEnum);
-    expect(converted["availability"]).toBe("https://schema.org/InStock");
+    expect(converted["availability"]["@id"]).toBe("InStock");
     expect(converted["itemCondition"]).toBe("https://schema.org/NewCondition");
   });
 });

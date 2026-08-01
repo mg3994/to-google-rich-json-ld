@@ -44,12 +44,29 @@ describe('SchemaValidator', () => {
     const raw = {
       "@context": "https://schema.org",
       "@type": "Offer",
-      "recipeIngredient": "Salt" // Invalid property for Offer (recipeIngredient belongs to Recipe!)
+      "recipeIngredient": "Salt"
     };
 
     const ast = builder.build(raw);
     const errors = validator.validate(ast);
     expect(errors.length).toBeGreaterThan(0);
     expect(errors[0]).toContain("is not valid for Schema.org type");
+  });
+
+  it('should issue a warning warning when datePublished datetime lacks a timezone', () => {
+    const builder = new ASTBuilder();
+    const validator = new SchemaValidator();
+
+    const raw = {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "headline": "Title",
+      "datePublished": "2026-08-01T12:00:00" // Missing timezone
+    };
+
+    const ast = builder.build(raw);
+    const errors = validator.validate(ast);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0]).toContain("is missing a time zone");
   });
 });

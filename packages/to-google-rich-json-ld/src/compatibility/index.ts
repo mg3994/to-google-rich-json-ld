@@ -108,9 +108,28 @@ export class CompatibilityEngine {
   private hoistGlobalEntities(doc: DocumentNode): DocumentNode {
     const mainNodes: ASTNode[] = [];
     const hoistedNodes: ASTNode[] = [];
+    let blankNodeCounter = 0;
+
+    const getNextBlankNodeId = (): string => `_:b${blankNodeCounter++}`;
+
+    const isTypeInAllowedRange = (typeName: string, allowedRanges: string[]): boolean => {
+      if (allowedRanges.length === 0) return true;
+      let current: string | null = typeName;
+      const visited = new Set<string>();
+      while (current && !visited.has(current)) {
+        visited.add(current);
+        if (allowedRanges.includes(current)) return true;
+        const def: { parent: string | null; properties: string[] } | undefined = (schemaMetadata.types as any)[current];
+        current = def ? def.parent : null;
+      }
+      return false;
+    };
 
     const walkAndExtract = (node: ASTNode): ASTNode => {
       if (node.type === "NodeObject") {
+        const nodeId = node.id || getNextBlankNodeId();
+        const nodeWithId = new NodeObjectNodeImpl(nodeId, node.types, node.properties);
+
         const cleanProperties: Record<string, ASTNode[]> = {};
         let hasIncluded = false;
         let includedNode: IncludedObjectNode | null = null;
@@ -129,28 +148,64 @@ export class CompatibilityEngine {
           }
         }
 
-        const parentNode = new NodeObjectNodeImpl(node.id, node.types, cleanProperties);
+        const parentNode = new NodeObjectNodeImpl(nodeId, node.types, cleanProperties);
 
-        // Extract and process @included
+        // Process @included
         if (hasIncluded && includedNode) {
           includedNode.included.forEach(child => {
             hoistedNodes.push(walkAndExtract(child));
           });
         }
 
-        // Extract and process @reverse
+        // Process @reverse with strict domain/range checks and shallow NodeReference linking
         if (hasReverse && reverseNode) {
           for (const [propName, childNodes] of Object.entries(reverseNode.properties)) {
-            for (const child of childNodes) {
-              if (child.type === "NodeObject") {
-                const childProperties = { ...child.properties };
-                const cleanParent = new NodeObjectNodeImpl(node.id, node.types, cleanProperties);
-                childProperties[propName] = [cleanParent];
-                const updatedChild = new NodeObjectNodeImpl(child.id, child.types, childProperties);
-                hoistedNodes.push(walkAndExtract(updatedChild));
-              } else {
-                hoistedNodes.push(walkAndExtract(child));
+            const propLocalName = propName.replace("https://schema.org/", "").replace("http://schema.org/", "");
+            const propDef: { domain: string[]; range: string[] } | undefined = (schemaMetadata.properties as any)[propLocalName];
+            const allowedRanges: string[] = propDef ? propDef.range : [];
+
+            // Check if our parent node's type matches the allowed ranges for this property
+            let isSemanticallyValid = false;
+            if (parentNode.types.length === 0) {
+              isSemanticallyValid = true; // allow if parent type is unknown
+            } else {
+              for (const parentTypeIRI of parentNode.types) {
+                const parentTypeName = parentTypeIRI.replace("https://schema.org/", "").replace("http://schema.org/", "");
+                if (isTypeInAllowedRange(parentTypeName, allowedRanges)) {
+                  isSemanticallyValid = true;
+                  break;
+                }
               }
+            }
+
+            if (isSemanticallyValid) {
+              for (const child of childNodes) {
+                if (child.type === "NodeObject") {
+                  const childProperties = { ...child.properties };
+
+                  // Retain name and identifier on parent reference to avoid semantic data loss while removing heavy nesting
+                  const parentRefProps: Record<string, ASTNode[]> = {};
+                  if (parentNode.properties["name"]) {
+                    parentRefProps["name"] = parentNode.properties["name"];
+                  }
+                  if (parentNode.properties["https://schema.org/name"]) {
+                    parentRefProps["https://schema.org/name"] = parentNode.properties["https://schema.org/name"];
+                  }
+                  if (parentNode.properties["http://schema.org/name"]) {
+                    parentRefProps["http://schema.org/name"] = parentNode.properties["http://schema.org/name"];
+                  }
+
+                  const parentReference = new NodeObjectNodeImpl(parentNode.id, parentNode.types, parentRefProps);
+                  childProperties[propName] = [parentReference];
+
+                  const updatedChild = new NodeObjectNodeImpl(child.id, child.types, childProperties);
+                  hoistedNodes.push(walkAndExtract(updatedChild));
+                } else {
+                  hoistedNodes.push(walkAndExtract(child));
+                }
+              }
+            } else {
+              console.warn(`Pruned semantically invalid reverse relationship: parent of type(s) [${parentNode.types.join(", ")}] cannot be assigned to property '${propName}' (expects ranges: [${allowedRanges.join(", ")}])`);
             }
           }
         }
@@ -260,11 +315,15 @@ export class CompatibilityEngine {
           return node;
         },
 
-        // 3. Canonicalize and Secure Schema.org Enum values (e.g. "InStock" -> "https://schema.org/InStock")
+        // 3. Canonicalize and Secure Schema.org Enum values
         (node: ASTNode, config: Config): ASTNode => {
           if (config.target === "google" && node.type === "NodeObject") {
             const properties: Record<string, ASTNode[]> = {};
-            const ENUM_PROPERTIES = new Set(["availability", "itemCondition", "dayOfWeek", "bookFormat", "paymentStatus", "contactType"]);
+            const ENUM_PROPERTIES = new Set([
+              "availability", "itemCondition", "dayOfWeek", "bookFormat", "paymentStatus", "contactType",
+              "https://schema.org/availability", "https://schema.org/itemCondition", "https://schema.org/dayOfWeek", "https://schema.org/bookFormat", "https://schema.org/paymentStatus", "https://schema.org/contactType",
+              "http://schema.org/availability", "http://schema.org/itemCondition", "http://schema.org/dayOfWeek", "http://schema.org/bookFormat", "http://schema.org/paymentStatus", "http://schema.org/contactType"
+            ]);
             const KNOWN_ENUM_VALUES = new Set([
               "InStock", "OutOfStock", "PreOrder", "InStoreOnly", "OnlineOnly", "Discontinued", "LimitedAvailability", "SoldOut",
               "NewCondition", "UsedCondition", "RefurbishedCondition", "DamagedCondition",
@@ -272,20 +331,34 @@ export class CompatibilityEngine {
               "Hardcover", "Paperback", "EBook", "Audiobook"
             ]);
 
+            const cleanEnumString = (valStr: string, propKey: string): string => {
+              let cleaned = valStr;
+              if (cleaned.startsWith("http://schema.org")) {
+                cleaned = cleaned.replace("http://schema.org", "https://schema.org");
+              }
+              if (KNOWN_ENUM_VALUES.has(cleaned) || (ENUM_PROPERTIES.has(propKey) && !cleaned.includes(":"))) {
+                return "https://schema.org/" + cleaned;
+              }
+              return cleaned;
+            };
+
             for (const [k, v] of Object.entries(node.properties)) {
               properties[k] = v.map(item => {
                 if (item.type === "Literal" && typeof item.value === 'string') {
-                  const valStr = item.value;
-                  if (KNOWN_ENUM_VALUES.has(valStr) || (ENUM_PROPERTIES.has(k) && !valStr.includes(":"))) {
-                    return new LiteralNodeImpl("https://schema.org/" + valStr);
-                  }
+                  return new LiteralNodeImpl(cleanEnumString(item.value, k));
                 }
+
                 if (item.type === "ValueObject" && typeof item.value === 'string') {
-                  const valStr = item.value;
-                  if (KNOWN_ENUM_VALUES.has(valStr) || (ENUM_PROPERTIES.has(k) && !valStr.includes(":"))) {
-                    return new ValueObjectNodeImpl("https://schema.org/" + valStr, item.language, item.direction, item.dataType);
+                  return new ValueObjectNodeImpl(cleanEnumString(item.value, k), item.language, item.direction, item.dataType);
+                }
+
+                if (item.type === "NodeObject") {
+                  if (item.id && (ENUM_PROPERTIES.has(k) || KNOWN_ENUM_VALUES.has(item.id.replace("https://schema.org/", "").replace("http://schema.org/", "")))) {
+                    const cleanedId = cleanEnumString(item.id, k);
+                    return new NodeObjectNodeImpl(cleanedId, item.types, item.properties);
                   }
                 }
+
                 return item;
               });
             }

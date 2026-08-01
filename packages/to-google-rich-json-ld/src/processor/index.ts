@@ -55,7 +55,7 @@ export class SemanticProcessor {
       }
 
       // Handle prefix expansion (e.g. schema:name or schema:Person)
-      if (resolved.includes(':') && !resolved.startsWith('http://') && !resolved.startsWith('https://')) {
+      if (resolved.includes(':') && !resolved.startsWith('http://') && !resolved.startsWith('https://') && !resolved.startsWith('_:')) {
         const colonIndex = resolved.indexOf(':');
         const prefix = resolved.substring(0, colonIndex);
         const suffix = resolved.substring(colonIndex + 1);
@@ -68,6 +68,11 @@ export class SemanticProcessor {
 
       if (resolved !== term) {
         return resolved;
+      }
+
+      // Secure check: do NOT append vocab to absolute IRIs or blank node identifiers!
+      if (term.startsWith('http://') || term.startsWith('https://') || term.startsWith('_:') || term.startsWith('urn:')) {
+        return term;
       }
 
       if (vocab) {
