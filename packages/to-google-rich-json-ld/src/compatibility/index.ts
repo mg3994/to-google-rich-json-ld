@@ -474,7 +474,8 @@ export class CompatibilityEngine {
         },
 
         // 5. Datetime ISO8601 Normalization, Numeric Field Cleaning, Empty Property Pruning,
-        // Auto-wrapping of lists, Nested Type Inference, Relative URL Expansion, Rating Normalization, SameAs securing, and Structural Value Deduplication.
+        // Auto-wrapping of lists, Nested Type Inference, Relative URL Expansion, Rating Normalization, SameAs securing,
+        // Singularization / Pluralization property term normalization, and Structural Value Deduplication.
         (node: ASTNode, config: Config, base?: string): ASTNode => {
           if (config.target === "google" && node.type === "NodeObject") {
             const properties: Record<string, ASTNode[]> = {};
@@ -490,6 +491,13 @@ export class CompatibilityEngine {
               "itemListElement", "recipeInstructions",
               "https://schema.org/itemListElement", "https://schema.org/recipeInstructions"
             ]);
+            const PLURAL_TO_SINGULAR_MAP: Record<string, string> = {
+              "reviews": "review",
+              "awards": "award",
+              "additionalTypes": "additionalType",
+              "founders": "founder",
+              "employees": "employee"
+            };
 
             const isDateField = (key: string): boolean => {
               const localKey = key.replace("https://schema.org/", "").replace("http://schema.org/", "");
@@ -514,7 +522,14 @@ export class CompatibilityEngine {
               return localType === "Rating" || localType === "AggregateRating";
             });
 
-            for (const [k, v] of Object.entries(node.properties)) {
+            for (let [k, v] of Object.entries(node.properties)) {
+              // Singularize property key if plural variant was used
+              const localKey = k.replace("https://schema.org/", "").replace("http://schema.org/", "");
+              if (PLURAL_TO_SINGULAR_MAP[localKey]) {
+                const namespace = k.startsWith("https://schema.org/") ? "https://schema.org/" : (k.startsWith("http://schema.org/") ? "http://schema.org/" : "");
+                k = namespace + PLURAL_TO_SINGULAR_MAP[localKey];
+              }
+
               // Auto-wrap itemListElement and recipeInstructions into @list containers
               if (LIST_PROPERTIES.has(k) && v.length > 0) {
                 if (v.length === 1 && v[0].type === "ListObject") {
@@ -567,11 +582,11 @@ export class CompatibilityEngine {
                 }
 
                 // Numeric Field Cleaning (e.g. "$1,499.00" -> "1499.00") and Rating String Normalization
-                const localKey = k.replace("https://schema.org/", "").replace("http://schema.org/", "");
-                if (NUMERIC_PROPERTIES.has(localKey) || NUMERIC_PROPERTIES.has(k)) {
+                const cleanLocalKey = k.replace("https://schema.org/", "").replace("http://schema.org/", "");
+                if (NUMERIC_PROPERTIES.has(cleanLocalKey) || NUMERIC_PROPERTIES.has(k)) {
                   if (item.type === "Literal" && typeof item.value === 'string') {
                     let val = item.value.trim();
-                    if (localKey === "ratingValue" || localKey === "bestRating" || localKey === "worstRating") {
+                    if (cleanLocalKey === "ratingValue" || cleanLocalKey === "bestRating" || cleanLocalKey === "worstRating") {
                       val = val.replace(/,/g, '.');
                     }
                     // Strip currency symbols and commas (thousands separator)
@@ -586,11 +601,52 @@ export class CompatibilityEngine {
                   }
                   if (item.type === "ValueObject" && typeof item.value === 'string') {
                     let val = item.value.trim();
-                    if (localKey === "ratingValue" || localKey === "bestRating" || localKey === "worstRating") {
+                    if (cleanLocalKey === "ratingValue" || cleanLocalKey === "bestRating" || cleanLocalKey === "worstRating") {
                       val = val.replace(/,/g, '.');
                     }
                     let cleaned = val.replace(/[$,€,£,¥]/g, '').replace(/,/g, '');
                     cleanedList.push(new ValueObjectNodeImpl(cleaned, item.language, item.direction, item.dataType));
+                    continue;
+                  }
+                }
+
+                // Price Currency Symbol Extraction (e.g. "$" -> "USD")
+                const isPriceCurrencyProp = k === "priceCurrency" || k === "https://schema.org/priceCurrency";
+                if (isPriceCurrencyProp) {
+                  if (item.type === "Literal" && typeof item.value === 'string') {
+                    const val = item.value.trim();
+                    const SYMBOL_TO_ISO: Record<string, string> = {
+                      "$": "USD",
+                      "€": "EUR",
+                      "£": "GBP",
+                      "¥": "JPY",
+                      "C$": "CAD",
+                      "A$": "AUD"
+                    };
+                    if (SYMBOL_TO_ISO[val]) {
+                      cleanedList.push(new LiteralNodeImpl(SYMBOL_TO_ISO[val]));
+                      continue;
+                    }
+                  }
+                }
+
+                // HTML Tag Stripping for description, reviewBody, and headline properties
+                const isDescriptionOrBody = cleanLocalKey === "description" || cleanLocalKey === "reviewBody" || cleanLocalKey === "headline";
+                if (isDescriptionOrBody) {
+                  if (item.type === "Literal" && typeof item.value === 'string') {
+                    let val = item.value;
+                    if (/<[a-z/][^>]*>/i.test(val)) {
+                      val = val.replace(/<[^>]*>/g, '').trim();
+                    }
+                    cleanedList.push(new LiteralNodeImpl(val));
+                    continue;
+                  }
+                  if (item.type === "ValueObject" && typeof item.value === 'string') {
+                    let val = item.value;
+                    if (/<[a-z/][^>]*>/i.test(val)) {
+                      val = val.replace(/<[^>]*>/g, '').trim();
+                    }
+                    cleanedList.push(new ValueObjectNodeImpl(val, item.language, item.direction, item.dataType));
                     continue;
                   }
                 }

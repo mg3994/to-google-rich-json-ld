@@ -292,4 +292,33 @@ describe('CompatibilityEngine', () => {
     expect(serialized["sameAs"]).toContain("https://twitter.com/mybrand");
     expect(serialized["sameAs"]).toContain("https://example.com");
   });
+
+  it('should singularize plural keys, extract currency symbols, and strip HTML tags', () => {
+    const builder = new ASTBuilder();
+    const serializer = new ASTSerializer();
+    const engine = new CompatibilityEngine(defaultConfig);
+
+    const doc = builder.build({
+      "@context": "https://schema.org",
+      "@type": "Product",
+      "name": "Ultimate Gaming Laptop",
+      "description": "<p>This is an <strong>awesome</strong> laptop!</p>", // HTML tag strip
+      "priceCurrency": "$", // Convert symbol to standard 3-letter ISO code
+      "reviews": [ // Singularize reviews -> review
+        {
+          "@type": "Review",
+          "reviewBody": "Loved it."
+        }
+      ]
+    });
+
+    const transformedDoc = engine.transform(doc);
+    const serialized = serializer.serialize(transformedDoc);
+
+    expect(serialized["description"]).toBe("This is an awesome laptop!");
+    expect(serialized["priceCurrency"]).toBe("USD");
+    expect(serialized["reviews"]).toBeUndefined();
+    expect(serialized["review"]).toBeDefined();
+    expect(serialized["review"]["reviewBody"]).toBe("Loved it.");
+  });
 });
