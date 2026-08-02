@@ -362,4 +362,33 @@ describe('CompatibilityEngine', () => {
     expect(serialized["isbn"]).toBe("9783161484100");
     expect(serialized["dayOfWeek"]).toBe("https://schema.org/Monday");
   });
+
+  it('should normalize coordinates/postalCode, and infer byArtist/performer missing types', () => {
+    const builder = new ASTBuilder();
+    const serializer = new ASTSerializer();
+    const engine = new CompatibilityEngine(defaultConfig);
+
+    const doc = builder.build({
+      "@context": "https://schema.org",
+      "@type": "Place",
+      "postalCode": "   90210  \t",
+      "latitude": "34.0522",
+      "longitude": "-118.2437",
+      "byArtist": {
+        "name": "Daft Punk" // untyped artist
+      },
+      "performer": {
+        "name": "The Beatles" // untyped performer
+      }
+    });
+
+    const transformedDoc = engine.transform(doc);
+    const serialized = serializer.serialize(transformedDoc);
+
+    expect(serialized["postalCode"]).toBe("90210");
+    expect(serialized["latitude"]).toBe(34.0522);
+    expect(serialized["longitude"]).toBe(-118.2437);
+    expect(serialized["byArtist"]["@type"]).toBe("https://schema.org/MusicGroup");
+    expect(serialized["performer"]["@type"]).toBe("https://schema.org/PerformingGroup");
+  });
 });

@@ -475,7 +475,8 @@ export class CompatibilityEngine {
 
         // 5. Datetime ISO8601 Normalization, Numeric Field Cleaning, Empty Property Pruning,
         // Auto-wrapping of lists, Nested Type Inference, Relative URL Expansion, Rating Normalization, SameAs securing,
-        // Singularization / Pluralization, White-space normalization, ISBN Normalization, DayOfWeek Normalization, and Structural Value Deduplication.
+        // Singularization / Pluralization, White-space normalization, ISBN Normalization, DayOfWeek Normalization,
+        // PostalCode / Coordinate Normalization, and Structural Value Deduplication.
         (node: ASTNode, config: Config, base?: string): ASTNode => {
           if (config.target === "google" && node.type === "NodeObject") {
             const properties: Record<string, ASTNode[]> = {};
@@ -501,6 +502,10 @@ export class CompatibilityEngine {
             const TEXT_NORMALIZATION_PROPERTIES = new Set([
               "name", "headline", "sku", "mpn", "telephone", "email",
               "https://schema.org/name", "https://schema.org/headline", "https://schema.org/sku", "https://schema.org/mpn", "https://schema.org/telephone", "https://schema.org/email"
+            ]);
+            const COORD_PROPERTIES = new Set([
+              "latitude", "longitude",
+              "https://schema.org/latitude", "https://schema.org/longitude"
             ]);
 
             const isDateField = (key: string): boolean => {
@@ -550,6 +555,8 @@ export class CompatibilityEngine {
 
               const cleanedList: ASTNode[] = [];
               const isAuthorProp = k === "author" || k === "https://schema.org/author";
+              const isByArtistProp = k === "byArtist" || k === "https://schema.org/byArtist";
+              const isPerformerProp = k === "performer" || k === "https://schema.org/performer";
 
               for (const item of v) {
                 // Prune empty string literals
@@ -560,9 +567,17 @@ export class CompatibilityEngine {
                   continue;
                 }
 
-                // Nested Type Inference for Author sub-objects
+                // Nested Type Inference for Author/Artist/Performer sub-objects
                 if (isAuthorProp && item.type === "NodeObject" && item.types.length === 0) {
                   cleanedList.push(new NodeObjectNodeImpl(item.id, ["https://schema.org/Person"], item.properties));
+                  continue;
+                }
+                if (isByArtistProp && item.type === "NodeObject" && item.types.length === 0) {
+                  cleanedList.push(new NodeObjectNodeImpl(item.id, ["https://schema.org/MusicGroup"], item.properties));
+                  continue;
+                }
+                if (isPerformerProp && item.type === "NodeObject" && item.types.length === 0) {
+                  cleanedList.push(new NodeObjectNodeImpl(item.id, ["https://schema.org/PerformingGroup"], item.properties));
                   continue;
                 }
 
@@ -614,6 +629,36 @@ export class CompatibilityEngine {
                     }
                     let cleaned = val.replace(/[$,€,£,¥]/g, '').replace(/,/g, '');
                     cleanedList.push(new ValueObjectNodeImpl(cleaned, item.language, item.direction, item.dataType));
+                    continue;
+                  }
+                }
+
+                // Coordinate (latitude, longitude) string-to-number normalization
+                if (COORD_PROPERTIES.has(k)) {
+                  if (item.type === "Literal" && typeof item.value === 'string') {
+                    const cleaned = item.value.trim().replace(/,/g, '.');
+                    if (/^-?\d+(?:\.\d+)?$/.test(cleaned)) {
+                      cleanedList.push(new LiteralNodeImpl(parseFloat(cleaned)));
+                      continue;
+                    }
+                  }
+                  if (item.type === "ValueObject" && typeof item.value === 'string') {
+                    const cleaned = item.value.trim().replace(/,/g, '.');
+                    if (/^-?\d+(?:\.\d+)?$/.test(cleaned)) {
+                      cleanedList.push(new ValueObjectNodeImpl(parseFloat(cleaned), item.language, item.direction, item.dataType));
+                      continue;
+                    }
+                  }
+                }
+
+                // PostalCode trimming and cleaning
+                if (cleanLocalKey === "postalCode" || k === "postalCode" || k === "https://schema.org/postalCode") {
+                  if (item.type === "Literal" && typeof item.value === 'string') {
+                    cleanedList.push(new LiteralNodeImpl(item.value.trim()));
+                    continue;
+                  }
+                  if (item.type === "ValueObject" && typeof item.value === 'string') {
+                    cleanedList.push(new ValueObjectNodeImpl(item.value.trim(), item.language, item.direction, item.dataType));
                     continue;
                   }
                 }
