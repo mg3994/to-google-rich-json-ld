@@ -92,6 +92,48 @@ export default function App() {
   "headline": "A great day for Linked Data",
   "datePublished": "2026-08-01"
 }`);
+    } else if (type === 'corrections') {
+      setInputCode(`{
+  "@context": "http://schema.org",
+  "@type": "Product",
+  "name": "Super Gaming Gear",
+  "PriceCurrency": "USD",
+  "price_currency": "EUR",
+  "price-currency": "GBP",
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": 9.5,
+    "bestRating": 5,
+    "worstRating": 10
+  },
+  "offers": {
+    "price": "$1,499.00"
+  }
+}`);
+    } else if (type === 'warnings') {
+      setInputCode(`{
+  "@context": "https://schema.org",
+  "@type": "LocalBusiness",
+  "name": "Greens & Grocer",
+  "telephone": "1-800-555-0199",
+  "email": "notanemail.com",
+  "datePublished": "2026-02-29",
+  "geo": {
+    "@type": "GeoCoordinates",
+    "latitude": 95.0,
+    "longitude": -190.0
+  },
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": 12.5,
+    "bestRating": 10,
+    "worstRating": 12
+  },
+  "offers": {
+    "@type": "Offer",
+    "price": -19.99
+  }
+}`);
     }
     setOutputCode('');
     setDetectedVer('');
@@ -109,10 +151,12 @@ export default function App() {
             Transform, clean, and validate any JSON-LD document natively for Google Rich Results compatibility.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           <button onClick={() => handleLoadSample('product')} style={btnStyleSecondary}>Load Product Sample</button>
           <button onClick={() => handleLoadSample('recipe')} style={btnStyleSecondary}>Load Recipe Sample</button>
           <button onClick={() => handleLoadSample('article')} style={btnStyleSecondary}>Load Article Sample</button>
+          <button onClick={() => handleLoadSample('corrections')} style={{ ...btnStyleSecondary, borderColor: '#10b981', color: '#10b981' }}>Load Corrections Sample</button>
+          <button onClick={() => handleLoadSample('warnings')} style={{ ...btnStyleSecondary, borderColor: '#ef4444', color: '#ef4444' }}>Load Warnings Sample</button>
         </div>
       </header>
 
