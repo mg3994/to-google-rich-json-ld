@@ -25,12 +25,16 @@ export class VersionDetector {
     const docArray = Array.isArray(doc) ? doc : [doc];
     let has1_1Keywords = false;
     let explicitVersion: string | null = null;
+    const visitedNodes = new Set<any>();
 
     const traverse = (node: any) => {
       if (!node || typeof node !== 'object') return;
+      if (visitedNodes.has(node)) return;
+      visitedNodes.add(node);
 
       if (Array.isArray(node)) {
         node.forEach(traverse);
+        visitedNodes.delete(node);
         return;
       }
 
@@ -56,6 +60,8 @@ export class VersionDetector {
         }
         traverse(node[key]);
       }
+
+      visitedNodes.delete(node);
     };
 
     docArray.forEach(traverse);

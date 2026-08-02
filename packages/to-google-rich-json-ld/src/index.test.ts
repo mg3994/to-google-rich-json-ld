@@ -286,5 +286,14 @@ describe('GoogleRichJsonLdEngine', () => {
 
     const converted = await convert(nodeA);
     expect(converted["name"]).toBe("Circular Widget");
+
+    // Verify Version Detection works on cyclic graph
+    const ver = await detectVersion(nodeA);
+    expect(ver).toBe("1.0");
+
+    // Verify Analysis works on cyclic graph
+    const info = await analyze(nodeA);
+    expect(info.keywordsUsed).toContain("@context");
+    expect(info.schemaTypes).toContain("Product");
   });
 });
