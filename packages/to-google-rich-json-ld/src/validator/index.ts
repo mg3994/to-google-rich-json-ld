@@ -79,6 +79,25 @@ export class SchemaValidator {
                   }
                 });
               }
+
+              // Telephone number E.164 format validation warning
+              if (propLocalName === "telephone") {
+                propValues.forEach(valNode => {
+                  let strVal: string | null = null;
+                  if (valNode.type === "Literal" && typeof valNode.value === 'string') {
+                    strVal = valNode.value;
+                  } else if (valNode.type === "ValueObject" && typeof valNode.value === 'string') {
+                    strVal = valNode.value;
+                  }
+
+                  if (strVal) {
+                    const hasPlus = strVal.trim().startsWith("+");
+                    if (!hasPlus) {
+                      errors.push(`Telephone property 'telephone' value '${strVal}' is missing a '+' prefix or is not in recommended E.164 format`);
+                    }
+                  }
+                });
+              }
             }
           }
         });

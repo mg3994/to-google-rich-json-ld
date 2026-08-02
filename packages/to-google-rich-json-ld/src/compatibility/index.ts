@@ -476,7 +476,7 @@ export class CompatibilityEngine {
         // 5. Datetime ISO8601 Normalization, Numeric Field Cleaning, Empty Property Pruning,
         // Auto-wrapping of lists, Nested Type Inference, Relative URL Expansion, Rating Normalization, SameAs securing,
         // Singularization / Pluralization, White-space normalization, ISBN Normalization, DayOfWeek Normalization,
-        // PostalCode / Coordinate Normalization, and Structural Value Deduplication.
+        // PostalCode / Coordinate Normalization, Property Casing Correction, and Structural Value Deduplication.
         (node: ASTNode, config: Config, base?: string): ASTNode => {
           if (config.target === "google" && node.type === "NodeObject") {
             const properties: Record<string, ASTNode[]> = {};
@@ -508,6 +508,15 @@ export class CompatibilityEngine {
               "https://schema.org/latitude", "https://schema.org/longitude"
             ]);
 
+            const toCamelCase = (str: string): string => {
+              if (str.startsWith("@")) return str;
+              let cleaned = str.replace(/[-_]([a-z])/g, (_, char) => char.toUpperCase());
+              if (cleaned.length > 0 && cleaned[0] === cleaned[0].toUpperCase()) {
+                cleaned = cleaned[0].toLowerCase() + cleaned.slice(1);
+              }
+              return cleaned;
+            };
+
             const isDateField = (key: string): boolean => {
               const localKey = key.replace("https://schema.org/", "").replace("http://schema.org/", "");
               return localKey.toLowerCase().includes("date") || localKey.toLowerCase().includes("time") || localKey === "availabilityStarts" || localKey === "availabilityEnds";
@@ -535,13 +544,41 @@ export class CompatibilityEngine {
               return localType === "AggregateRating";
             });
 
+            // Phase A: Prefix casing mapping, property casing correction, and singularization with array merging
+            const mergedProperties: Record<string, ASTNode[]> = {};
             for (let [k, v] of Object.entries(node.properties)) {
-              // Singularize property key if plural variant was used
-              const localKey = k.replace("https://schema.org/", "").replace("http://schema.org/", "");
-              if (PLURAL_TO_SINGULAR_MAP[localKey]) {
-                const namespace = k.startsWith("https://schema.org/") ? "https://schema.org/" : (k.startsWith("http://schema.org/") ? "http://schema.org/" : "");
-                k = namespace + PLURAL_TO_SINGULAR_MAP[localKey];
+              if (k.startsWith("@")) {
+                mergedProperties[k] = v;
+                continue;
               }
+
+              // Apply casing correction (e.g. Price_Currency -> priceCurrency)
+              const originalLocalKey = k.replace("https://schema.org/", "").replace("http://schema.org/", "");
+              const correctedLocalKey = toCamelCase(originalLocalKey);
+              let finalK = k;
+              if (correctedLocalKey !== originalLocalKey) {
+                const namespace = k.startsWith("https://schema.org/") ? "https://schema.org/" : (k.startsWith("http://schema.org/") ? "http://schema.org/" : "");
+                finalK = namespace + correctedLocalKey;
+              }
+
+              // Singularize property key if plural variant was used
+              const localKey = finalK.replace("https://schema.org/", "").replace("http://schema.org/", "");
+              if (PLURAL_TO_SINGULAR_MAP[localKey]) {
+                const namespace = finalK.startsWith("https://schema.org/") ? "https://schema.org/" : (finalK.startsWith("http://schema.org/") ? "http://schema.org/" : "");
+                finalK = namespace + PLURAL_TO_SINGULAR_MAP[localKey];
+              }
+
+              mergedProperties[finalK] = [...(mergedProperties[finalK] || []), ...v];
+            }
+
+            // Phase B: Normalization, cleaning, and filtering of the merged properties
+            for (let [k, v] of Object.entries(mergedProperties)) {
+              if (k.startsWith("@")) {
+                properties[k] = v;
+                continue;
+              }
+
+              const localKey = k.replace("https://schema.org/", "").replace("http://schema.org/", "");
 
               // Auto-wrap itemListElement and recipeInstructions into @list containers
               if (LIST_PROPERTIES.has(k) && v.length > 0) {
@@ -567,7 +604,7 @@ export class CompatibilityEngine {
                   continue;
                 }
 
-                // Nested Type Inference for Author/Artist/Performer sub-objects
+                // Nested Type Inference for Author sub-objects
                 if (isAuthorProp && item.type === "NodeObject" && item.types.length === 0) {
                   cleanedList.push(new NodeObjectNodeImpl(item.id, ["https://schema.org/Person"], item.properties));
                   continue;

@@ -195,4 +195,33 @@ describe('GoogleRichJsonLdEngine', () => {
     expect(converted["availability"]["@id"]).toBe("InStock");
     expect(converted["itemCondition"]).toBe("https://schema.org/NewCondition");
   });
+
+  it('should automatically correct property casing errors (PascalCase, snake_case, kebab-case -> camelCase)', async () => {
+    const misCasedDoc = {
+      "@context": "https://schema.org",
+      "@type": "Offer",
+      "PriceCurrency": "USD",
+      "price_currency": "EUR",
+      "price-currency": "GBP"
+    };
+
+    const converted = await convert(misCasedDoc);
+    // After normalization, priceCurrency should be correctly normalized, populated, and merged
+    expect(converted["priceCurrency"]).toBeDefined();
+    expect(converted["priceCurrency"]).toContain("USD");
+    expect(converted["priceCurrency"]).toContain("EUR");
+    expect(converted["priceCurrency"]).toContain("GBP");
+  });
+
+  it('should produce a warning on telephone field if E.164 format is not satisfied', async () => {
+    const phoneDoc = {
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      "name": "Greens Grocer",
+      "telephone": "1-800-555-0199" // Missing '+'
+    };
+
+    const result = await validate(phoneDoc);
+    expect(result.errors.some(err => err.includes("telephone") && err.includes("missing a '+' prefix"))).toBe(true);
+  });
 });

@@ -69,4 +69,21 @@ describe('SchemaValidator', () => {
     expect(errors.length).toBeGreaterThan(0);
     expect(errors[0]).toContain("is missing a time zone");
   });
+
+  it('should issue a warning when telephone lacks a + prefix', () => {
+    const builder = new ASTBuilder();
+    const validator = new SchemaValidator();
+
+    const raw = {
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      "name": "Greens Grocer",
+      "telephone": "1-800-555-0199" // Missing '+'
+    };
+
+    const ast = builder.build(raw);
+    const errors = validator.validate(ast);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors.some(err => err.includes("telephone") && err.includes("missing a '+' prefix"))).toBe(true);
+  });
 });
