@@ -43,7 +43,7 @@ function extractContextDefaults(ctx: any): Record<string, any> {
   return defaults;
 }
 
-const areNodesEqual = (node1: ASTNode, node2: ASTNode): boolean => {
+const areNodesEqual = (node1: ASTNode, node2: ASTNode, visited = new Set<string>()): boolean => {
   if (node1.type !== node2.type) return false;
   if (node1.type === "Literal" || node1.type === "IRI" || node1.type === "BlankNode" || node1.type === "Keyword") {
     return (node1 as any).value === (node2 as any).value;
@@ -57,29 +57,40 @@ const areNodesEqual = (node1: ASTNode, node2: ASTNode): boolean => {
     const n1 = node1 as NodeObjectNode;
     const n2 = node2 as NodeObjectNode;
     if (n1.id !== n2.id) return false;
+
+    // Cycle detection for deep comparison
+    const pairKey = `${n1.id || 'b1'}_${n2.id || 'b2'}`;
+    if (visited.has(pairKey)) {
+      return true; // Match found or cyclic fallback to avoid infinite loops
+    }
+    visited.add(pairKey);
+
     if (n1.types.length !== n2.types.length || !n1.types.every((t, i) => t === n2.types[i])) return false;
     const keys1 = Object.keys(n1.properties);
     const keys2 = Object.keys(n2.properties);
     if (keys1.length !== keys2.length) return false;
-    return keys1.every(k => {
+    const match = keys1.every(k => {
       const val1 = n1.properties[k];
       const val2 = n2.properties[k];
       if (!val2) return false;
       if (val1.length !== val2.length) return false;
-      return val1.every((item, idx) => areNodesEqual(item, val2[idx]));
+      return val1.every((item, idx) => areNodesEqual(item, val2[idx], visited));
     });
+
+    visited.delete(pairKey);
+    return match;
   }
   if (node1.type === "ListObject") {
     const l1 = node1 as ListObjectNode;
     const l2 = node2 as ListObjectNode;
     if (l1.list.length !== l2.list.length) return false;
-    return l1.list.every((item, idx) => areNodesEqual(item, l2.list[idx]));
+    return l1.list.every((item, idx) => areNodesEqual(item, l2.list[idx], visited));
   }
   if (node1.type === "SetObject") {
     const s1 = node1 as SetObjectNode;
     const s2 = node2 as SetObjectNode;
     if (s1.set.length !== s2.set.length) return false;
-    return s1.set.every((item, idx) => areNodesEqual(item, s2.set[idx]));
+    return s1.set.every((item, idx) => areNodesEqual(item, s2.set[idx], visited));
   }
   return false;
 };
@@ -138,7 +149,14 @@ export class CompatibilityEngine {
     fn: (node: ASTNode, config: Config, base?: string) => ASTNode,
     base: string
   ): DocumentNode {
+    const visitedNodes = new Set<ASTNode>();
+
     const transformNode = (node: ASTNode): ASTNode => {
+      if (visitedNodes.has(node)) {
+        return node; // Return node as-is if circular path detected
+      }
+      visitedNodes.add(node);
+
       let updatedNode = fn(node, this.config, base);
 
       if (updatedNode.type === "NodeObject") {
@@ -146,23 +164,32 @@ export class CompatibilityEngine {
         for (const [k, v] of Object.entries(updatedNode.properties)) {
           properties[k] = v.map(transformNode);
         }
-        return new NodeObjectNodeImpl(updatedNode.id, updatedNode.types, properties);
+        const result = new NodeObjectNodeImpl(updatedNode.id, updatedNode.types, properties);
+        visitedNodes.delete(node);
+        return result;
       }
 
       if (updatedNode.type === "GraphObject") {
-        return new GraphObjectNodeImpl(updatedNode.id, updatedNode.graph.map(transformNode));
+        const result = new GraphObjectNodeImpl(updatedNode.id, updatedNode.graph.map(transformNode));
+        visitedNodes.delete(node);
+        return result;
       }
 
       if (updatedNode.type === "SetObject") {
-        return new SetObjectNodeImpl(updatedNode.set.map(transformNode));
+        const result = new SetObjectNodeImpl(updatedNode.set.map(transformNode));
+        visitedNodes.delete(node);
+        return result;
       }
 
       if (updatedNode.type === "Document") {
         const body = updatedNode.body.map(transformNode);
         const context = updatedNode.context ? transformNode(updatedNode.context) as ContextNode : null;
-        return new DocumentNodeImpl(context, body);
+        const result = new DocumentNodeImpl(context, body);
+        visitedNodes.delete(node);
+        return result;
       }
 
+      visitedNodes.delete(node);
       return updatedNode;
     };
 
@@ -178,6 +205,7 @@ export class CompatibilityEngine {
     const mainNodes: ASTNode[] = [];
     const hoistedNodes: ASTNode[] = [];
     let blankNodeCounter = 0;
+    const visitedWalkNodes = new Set<ASTNode>();
 
     const getNextBlankNodeId = (): string => `_:b${blankNodeCounter++}`;
 
@@ -195,6 +223,11 @@ export class CompatibilityEngine {
     };
 
     const walkAndExtract = (node: ASTNode): ASTNode => {
+      if (visitedWalkNodes.has(node)) {
+        return node;
+      }
+      visitedWalkNodes.add(node);
+
       if (node.type === "NodeObject") {
         const nodeId = node.id || null;
         const parentNode = new NodeObjectNodeImpl(nodeId, node.types, node.properties);
@@ -276,17 +309,23 @@ export class CompatibilityEngine {
           }
         }
 
+        visitedWalkNodes.delete(node);
         return cleanParentNode;
       }
 
       if (node.type === "GraphObject") {
-        return new GraphObjectNodeImpl(node.id, node.graph.map(walkAndExtract));
+        const result = new GraphObjectNodeImpl(node.id, node.graph.map(walkAndExtract));
+        visitedWalkNodes.delete(node);
+        return result;
       }
 
       if (node.type === "SetObject") {
-        return new SetObjectNodeImpl(node.set.map(walkAndExtract));
+        const result = new SetObjectNodeImpl(node.set.map(walkAndExtract));
+        visitedWalkNodes.delete(node);
+        return result;
       }
 
+      visitedWalkNodes.delete(node);
       return node;
     };
 

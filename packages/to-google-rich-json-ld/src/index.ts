@@ -141,9 +141,12 @@ export class GoogleRichJsonLdEngine implements SemanticEngine {
         return { valid: false, errors };
       }
 
-      // 1. Basic rich results conformance checks
+      // 1. Basic rich results conformance checks with cycle protection
+      const visitedNodes = new Set<any>();
       const traverse = (node: any) => {
         if (!node || typeof node !== 'object') return;
+        if (visitedNodes.has(node)) return;
+        visitedNodes.add(node);
 
         if (node['@type'] === 'Product') {
           if (!node['name']) {
@@ -255,8 +258,11 @@ export class GoogleRichJsonLdEngine implements SemanticEngine {
     const schemaTypes = new Set<string>();
     const contextUrls = new Set<string>();
 
+    const visitedNodes = new Set<any>();
     const traverse = (node: any) => {
       if (!node || typeof node !== 'object') return;
+      if (visitedNodes.has(node)) return;
+      visitedNodes.add(node);
 
       if (Array.isArray(node)) {
         node.forEach(traverse);

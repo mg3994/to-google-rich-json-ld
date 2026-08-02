@@ -50,8 +50,12 @@ export class SchemaValidator {
    */
   public validate(node: ASTNode): string[] {
     const errors: string[] = [];
+    const visitedNodes = new Set<ASTNode>();
 
     const traverse = (n: ASTNode) => {
+      if (visitedNodes.has(n)) return;
+      visitedNodes.add(n);
+
       if (n.type === "NodeObject") {
         // If the object has a ratingValue, let's validate its boundaries if worstRating/bestRating are defined.
         if (n.properties["ratingValue"] || n.properties["https://schema.org/ratingValue"]) {
@@ -287,6 +291,8 @@ export class SchemaValidator {
       } else if (n.type === "ListObject") {
         n.list.forEach(traverse);
       }
+
+      visitedNodes.delete(n);
     };
 
     traverse(node);

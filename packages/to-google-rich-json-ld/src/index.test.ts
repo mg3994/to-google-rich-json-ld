@@ -264,4 +264,27 @@ describe('GoogleRichJsonLdEngine', () => {
     const converted = await convert(ratingDoc);
     expect(converted["aggregateRating"]["worstRating"]).toBe(0.5);
   });
+
+  it('should gracefully handle and validate highly cyclic documents without call stack exhaustion', async () => {
+    // Construct a programmatically cyclic raw object
+    const nodeA: any = {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      "name": "Circular Widget"
+    };
+    const nodeB: any = {
+      "@type": "Offer",
+      "price": 100,
+      "priceCurrency": "USD"
+    };
+
+    nodeA.offers = nodeB;
+    nodeB.seller = nodeA; // Loop: nodeA -> offers -> nodeB -> seller -> nodeA
+
+    const valResult = await validate(nodeA);
+    expect(valResult.valid).toBe(true);
+
+    const converted = await convert(nodeA);
+    expect(converted["name"]).toBe("Circular Widget");
+  });
 });

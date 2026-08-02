@@ -15,20 +15,31 @@ export class Parser {
   }
 
   /**
-   * Deeply clone an object/array to maintain strict immutability.
+   * Deeply clone an object/array to maintain strict immutability, with full cycle-detection support.
    */
-  private static deepClone(val: any): any {
+  private static deepClone(val: any, visited = new Map<any, any>()): any {
     if (val === null || typeof val !== 'object') {
       return val;
     }
+    if (visited.has(val)) {
+      return visited.get(val);
+    }
+
     if (Array.isArray(val)) {
-      return val.map((item) => Parser.deepClone(item));
+      const clonedArr: any[] = [];
+      visited.set(val, clonedArr);
+      for (const item of val) {
+        clonedArr.push(Parser.deepClone(item, visited));
+      }
+      return clonedArr;
     }
-    const cloned: Record<string, any> = {};
+
+    const clonedObj: Record<string, any> = {};
+    visited.set(val, clonedObj);
     for (const [k, v] of Object.entries(val)) {
-      cloned[k] = Parser.deepClone(v);
+      clonedObj[k] = Parser.deepClone(v, visited);
     }
-    return cloned;
+    return clonedObj;
   }
 
   /**

@@ -153,10 +153,13 @@ export class ExtensionNodeImpl implements ExtensionNode {
 }
 
 export class ASTBuilder {
+  private visitedObjects = new Set<any>();
+
   /**
    * Build an AST DocumentNode from a RawDocument.
    */
   public build(doc: RawDocument): DocumentNode {
+    this.visitedObjects.clear();
     if (!doc) {
       return new DocumentNodeImpl(null, []);
     }
@@ -177,6 +180,7 @@ export class ASTBuilder {
       body.push(this.parseNode(doc));
     }
 
+    this.visitedObjects.clear();
     return new DocumentNodeImpl(contextNode, body);
   }
 
@@ -200,93 +204,89 @@ export class ASTBuilder {
       return new LiteralNodeImpl(val);
     }
 
-    if (Array.isArray(val)) {
-      return new SetObjectNodeImpl(val.map(item => this.parseNode(item)));
+    if (this.visitedObjects.has(val)) {
+      const refId = typeof val['@id'] === 'string' ? val['@id'] : null;
+      return new NodeObjectNodeImpl(refId, [], {});
     }
+    this.visitedObjects.add(val);
 
-    // Check if it's a Value Object (has @value)
-    if ('@value' in val) {
-      return new ValueObjectNodeImpl(
+    let result: ASTNode;
+
+    if (Array.isArray(val)) {
+      result = new SetObjectNodeImpl(val.map(item => this.parseNode(item)));
+    } else if ('@value' in val) {
+      result = new ValueObjectNodeImpl(
         val['@value'],
         val['@language'] || null,
         val['@direction'] || null,
         val['@type'] || null
       );
-    }
-
-    // Check if it's a List Object (has @list)
-    if ('@list' in val) {
+    } else if ('@list' in val) {
       const items = Array.isArray(val['@list']) ? val['@list'] : [val['@list']];
-      return new ListObjectNodeImpl(items.map(item => this.parseNode(item)));
-    }
-
-    // Check if it's a Graph Object (has @graph)
-    if ('@graph' in val) {
+      result = new ListObjectNodeImpl(items.map(item => this.parseNode(item)));
+    } else if ('@graph' in val) {
       const items = Array.isArray(val['@graph']) ? val['@graph'] : [val['@graph']];
-      return new GraphObjectNodeImpl(
+      result = new GraphObjectNodeImpl(
         val['@id'] || null,
         items.map(item => this.parseNode(item))
       );
-    }
-
-    // Check if it's a Language Map
-    if (this.isLanguageMap(val)) {
+    } else if (this.isLanguageMap(val)) {
       const map: Record<string, string[]> = {};
       for (const [k, v] of Object.entries(val)) {
         map[k] = Array.isArray(v) ? v.map(String) : [String(v)];
       }
-      return new LanguageMapNodeImpl(map);
-    }
+      result = new LanguageMapNodeImpl(map);
+    } else {
+      // Build NodeObject
+      const id = typeof val['@id'] === 'string' ? val['@id'] : null;
 
-    // Build NodeObject
-    const id = typeof val['@id'] === 'string' ? val['@id'] : null;
-
-    let types: string[] = [];
-    if ('@type' in val) {
-      if (Array.isArray(val['@type'])) {
-        types = val['@type'].map((t: any) => String(t));
-      } else if (typeof val['@type'] === 'string') {
-        types = [val['@type']];
-      }
-    }
-
-    const properties: Record<string, ASTNode[]> = {};
-
-    for (const [k, v] of Object.entries(val)) {
-      if (k === '@context' || k === '@id' || k === '@type') {
-        continue;
+      let types: string[] = [];
+      if ('@type' in val) {
+        if (Array.isArray(val['@type'])) {
+          types = val['@type'].map((t: any) => String(t));
+        } else if (typeof val['@type'] === 'string') {
+          types = [val['@type']];
+        }
       }
 
-      // Check if keyword is unknown
-      if (k.startsWith('@')) {
-        if (!KNOWN_KEYWORDS.has(k)) {
-          properties[k] = [new UnknownKeywordNodeImpl(k, v)];
+      const properties: Record<string, ASTNode[]> = {};
+
+      for (const [k, v] of Object.entries(val)) {
+        if (k === '@context' || k === '@id' || k === '@type') {
           continue;
         }
 
-        // Support @reverse keyword as a child property
-        if (k === '@reverse' && v && typeof v === 'object') {
-          const revProperties: Record<string, ASTNode[]> = {};
-          for (const [revK, revV] of Object.entries(v)) {
-            const arr = Array.isArray(revV) ? revV : [revV];
-            revProperties[revK] = arr.map(item => this.parseNode(item));
+        if (k.startsWith('@')) {
+          if (!KNOWN_KEYWORDS.has(k)) {
+            properties[k] = [new UnknownKeywordNodeImpl(k, v)];
+            continue;
           }
-          properties[k] = [new ReverseObjectNodeImpl(revProperties)];
-          continue;
+
+          if (k === '@reverse' && v && typeof v === 'object') {
+            const revProperties: Record<string, ASTNode[]> = {};
+            for (const [revK, revV] of Object.entries(v)) {
+              const arr = Array.isArray(revV) ? revV : [revV];
+              revProperties[revK] = arr.map(item => this.parseNode(item));
+            }
+            properties[k] = [new ReverseObjectNodeImpl(revProperties)];
+            continue;
+          }
+
+          if (k === '@included') {
+            const items = Array.isArray(v) ? v : [v];
+            properties[k] = [new IncludedObjectNodeImpl(items.map(item => this.parseNode(item)))];
+            continue;
+          }
         }
 
-        // Support @included keyword as a child property
-        if (k === '@included') {
-          const items = Array.isArray(v) ? v : [v];
-          properties[k] = [new IncludedObjectNodeImpl(items.map(item => this.parseNode(item)))];
-          continue;
-        }
+        const arr = Array.isArray(v) ? v : [v];
+        properties[k] = arr.map(item => this.parseNode(item));
       }
 
-      const arr = Array.isArray(v) ? v : [v];
-      properties[k] = arr.map(item => this.parseNode(item));
+      result = new NodeObjectNodeImpl(id, types, properties);
     }
 
-    return new NodeObjectNodeImpl(id, types, properties);
+    this.visitedObjects.delete(val);
+    return result;
   }
 }
