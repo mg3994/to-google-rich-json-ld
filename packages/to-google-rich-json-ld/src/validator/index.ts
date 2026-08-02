@@ -42,6 +42,48 @@ export class SchemaValidator {
 
     const traverse = (n: ASTNode) => {
       if (n.type === "NodeObject") {
+        // If the object has a ratingValue, let's validate its boundaries if worstRating/bestRating are defined.
+        if (n.properties["ratingValue"] || n.properties["https://schema.org/ratingValue"]) {
+          const ratingKey = "ratingValue" in n.properties ? "ratingValue" : "https://schema.org/ratingValue";
+          const ratingValNode = n.properties[ratingKey] && n.properties[ratingKey][0];
+          let ratingVal: number | null = null;
+          if (ratingValNode) {
+            if (ratingValNode.type === "Literal" && typeof ratingValNode.value === 'number') ratingVal = ratingValNode.value;
+            else if (ratingValNode.type === "ValueObject" && typeof ratingValNode.value === 'number') ratingVal = ratingValNode.value;
+            else if (ratingValNode.type === "Literal" && typeof ratingValNode.value === 'string') ratingVal = parseFloat(ratingValNode.value);
+            else if (ratingValNode.type === "ValueObject" && typeof ratingValNode.value === 'string') ratingVal = parseFloat(ratingValNode.value);
+          }
+
+          if (ratingVal !== null) {
+            const bestKey = "bestRating" in n.properties ? "bestRating" : ("https://schema.org/bestRating" in n.properties ? "https://schema.org/bestRating" : "");
+            const bestValNode = bestKey ? n.properties[bestKey] && n.properties[bestKey][0] : null;
+            let bestVal: number | null = null;
+            if (bestValNode) {
+              if (bestValNode.type === "Literal" && typeof bestValNode.value === 'number') bestVal = bestValNode.value;
+              else if (bestValNode.type === "ValueObject" && typeof bestValNode.value === 'number') bestVal = bestValNode.value;
+              else if (bestValNode.type === "Literal" && typeof bestValNode.value === 'string') bestVal = parseFloat(bestValNode.value);
+              else if (bestValNode.type === "ValueObject" && typeof bestValNode.value === 'string') bestVal = parseFloat(bestValNode.value);
+            }
+
+            const worstKey = "worstRating" in n.properties ? "worstRating" : ("https://schema.org/worstRating" in n.properties ? "https://schema.org/worstRating" : "");
+            const worstValNode = worstKey ? n.properties[worstKey] && n.properties[worstKey][0] : null;
+            let worstVal: number | null = null;
+            if (worstValNode) {
+              if (worstValNode.type === "Literal" && typeof worstValNode.value === 'number') worstVal = worstValNode.value;
+              else if (worstValNode.type === "ValueObject" && typeof worstValNode.value === 'number') worstVal = worstValNode.value;
+              else if (worstValNode.type === "Literal" && typeof worstValNode.value === 'string') worstVal = parseFloat(worstValNode.value);
+              else if (worstValNode.type === "ValueObject" && typeof worstValNode.value === 'string') worstVal = parseFloat(worstValNode.value);
+            }
+
+            if (bestVal !== null && ratingVal > bestVal) {
+              errors.push(`Rating property 'ratingValue' value '${ratingVal}' is greater than 'bestRating' value '${bestVal}'`);
+            }
+            if (worstVal !== null && ratingVal < worstVal) {
+              errors.push(`Rating property 'ratingValue' value '${ratingVal}' is less than 'worstRating' value '${worstVal}'`);
+            }
+          }
+        }
+
         n.types.forEach(typeIRI => {
           const typeName = typeIRI.replace("https://schema.org/", "");
           if (typeName && !this.types[typeName]) {
@@ -131,6 +173,26 @@ export class SchemaValidator {
 
                   if (strVal && !strVal.includes("@")) {
                     errors.push(`Email property 'email' value '${strVal}' is missing an '@' symbol and is not a valid email address`);
+                  }
+                });
+              }
+
+              // Price range validation warning
+              if (propLocalName === "price" || propLocalName === "lowPrice" || propLocalName === "highPrice" || propLocalName === "priceMin" || propLocalName === "priceMax") {
+                propValues.forEach(valNode => {
+                  let numVal: number | null = null;
+                  if (valNode.type === "Literal" && typeof valNode.value === 'number') {
+                    numVal = valNode.value;
+                  } else if (valNode.type === "ValueObject" && typeof valNode.value === 'number') {
+                    numVal = valNode.value;
+                  } else if (valNode.type === "Literal" && typeof valNode.value === 'string') {
+                    numVal = parseFloat(valNode.value);
+                  } else if (valNode.type === "ValueObject" && typeof valNode.value === 'string') {
+                    numVal = parseFloat(valNode.value);
+                  }
+
+                  if (numVal !== null && numVal < 0) {
+                    errors.push(`Price property '${propLocalName}' value '${numVal}' cannot be negative`);
                   }
                 });
               }

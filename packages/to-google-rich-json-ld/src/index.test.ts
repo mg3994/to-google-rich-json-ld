@@ -244,4 +244,24 @@ describe('GoogleRichJsonLdEngine', () => {
     const converted = await convert(ratingDoc);
     expect(converted["aggregateRating"]["bestRating"]).toBe(9.5);
   });
+
+  it('should auto-adjust worstRating to match ratingValue if ratingValue falls below worstRating', async () => {
+    const ratingDoc = {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      "name": "Budget Mouse",
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": 0.5,
+        "worstRating": 1 // Out-of-bounds (ratingValue is smaller than worstRating)
+      },
+      "offers": {
+        "@type": "Offer",
+        "price": 15
+      }
+    };
+
+    const converted = await convert(ratingDoc);
+    expect(converted["aggregateRating"]["worstRating"]).toBe(0.5);
+  });
 });

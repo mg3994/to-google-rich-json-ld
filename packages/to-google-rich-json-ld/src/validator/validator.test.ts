@@ -120,4 +120,38 @@ describe('SchemaValidator', () => {
     expect(errors.length).toBeGreaterThan(0);
     expect(errors.some(err => err.includes("email") && err.includes("missing an '@' symbol"))).toBe(true);
   });
+
+  it('should issue a warning for negative price values', () => {
+    const builder = new ASTBuilder();
+    const validator = new SchemaValidator();
+
+    const raw = {
+      "@context": "https://schema.org",
+      "@type": "Offer",
+      "price": -19.99
+    };
+
+    const ast = builder.build(raw);
+    const errors = validator.validate(ast);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors.some(err => err.includes("price") && err.includes("cannot be negative"))).toBe(true);
+  });
+
+  it('should issue a warning when ratingValue is out of bounds (worstRating <= ratingValue <= bestRating)', () => {
+    const builder = new ASTBuilder();
+    const validator = new SchemaValidator();
+
+    const raw = {
+      "@context": "https://schema.org",
+      "@type": "AggregateRating",
+      "ratingValue": 0.5,
+      "worstRating": 1,
+      "bestRating": 5
+    };
+
+    const ast = builder.build(raw);
+    const errors = validator.validate(ast);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors.some(err => err.includes("ratingValue") && err.includes("is less than 'worstRating'"))).toBe(true);
+  });
 });

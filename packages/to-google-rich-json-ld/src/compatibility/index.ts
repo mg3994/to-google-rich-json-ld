@@ -917,7 +917,27 @@ export class CompatibilityEngine {
                 }
 
                 if (!hasWorst) {
-                  properties[worstKey] = [new LiteralNodeImpl(1)];
+                  const defaultWorst = (ratingValNum !== null && ratingValNum < 1) ? ratingValNum : 1;
+                  properties[worstKey] = [new LiteralNodeImpl(defaultWorst)];
+                } else if (ratingValNum !== null) {
+                  // If worstRating is present but larger than ratingValue, adjust it to match ratingValue
+                  const actualWorstKey = worstKey in properties ? worstKey : ("https://schema.org/worstRating" in properties ? "https://schema.org/worstRating" : "worstRating");
+                  const worstNode = properties[actualWorstKey] && properties[actualWorstKey][0];
+                  let worstValNum: number | null = null;
+                  if (worstNode) {
+                    if (worstNode.type === "Literal" && typeof worstNode.value === 'number') {
+                      worstValNum = worstNode.value;
+                    } else if (worstNode.type === "ValueObject" && typeof worstNode.value === 'number') {
+                      worstValNum = worstNode.value;
+                    } else if (worstNode.type === "Literal" && typeof worstNode.value === 'string') {
+                      worstValNum = parseFloat(worstNode.value);
+                    } else if (worstNode.type === "ValueObject" && typeof worstNode.value === 'string') {
+                      worstValNum = parseFloat(worstNode.value);
+                    }
+                  }
+                  if (worstValNum !== null && ratingValNum < worstValNum) {
+                    properties[actualWorstKey] = [new LiteralNodeImpl(ratingValNum)];
+                  }
                 }
 
                 if (isAggregateRatingType) {
