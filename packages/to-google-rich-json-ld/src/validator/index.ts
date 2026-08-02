@@ -81,6 +81,9 @@ export class SchemaValidator {
             if (worstVal !== null && ratingVal < worstVal) {
               errors.push(`Rating property 'ratingValue' value '${ratingVal}' is less than 'worstRating' value '${worstVal}'`);
             }
+            if (bestVal !== null && worstVal !== null && bestVal <= worstVal) {
+              errors.push(`Rating property 'bestRating' value '${bestVal}' must be greater than 'worstRating' value '${worstVal}'`);
+            }
           }
         }
 
@@ -141,7 +144,7 @@ export class SchemaValidator {
                 });
               }
 
-              // ISBN format/length validation warning
+              // ISBN format/length and checksum validation warning
               if (propLocalName === "isbn") {
                 propValues.forEach(valNode => {
                   let strVal: string | null = null;
@@ -153,9 +156,29 @@ export class SchemaValidator {
 
                   if (strVal) {
                     const cleanIsbn = strVal.replace(/[-\s]/g, "");
-                    const isValidIsbn = (cleanIsbn.length === 10 && /^\d{9}[\dX]$/i.test(cleanIsbn)) || (cleanIsbn.length === 13 && /^\d{13}$/.test(cleanIsbn));
-                    if (!isValidIsbn) {
+                    const isWellFormed = (cleanIsbn.length === 10 && /^\d{9}[\dX]$/i.test(cleanIsbn)) || (cleanIsbn.length === 13 && /^\d{13}$/.test(cleanIsbn));
+                    if (!isWellFormed) {
                       errors.push(`ISBN property 'isbn' value '${strVal}' is not a valid ISBN-10 or ISBN-13 number`);
+                    } else if (cleanIsbn.length === 10) {
+                      // Check ISBN-10 checksum
+                      let sum = 0;
+                      for (let i = 0; i < 9; i++) {
+                        sum += parseInt(cleanIsbn[i]) * (10 - i);
+                      }
+                      const lastChar = cleanIsbn[9].toUpperCase();
+                      sum += (lastChar === "X" ? 10 : parseInt(lastChar));
+                      if (sum % 11 !== 0) {
+                        errors.push(`ISBN property 'isbn' value '${strVal}' has an invalid ISBN-10 checksum`);
+                      }
+                    } else if (cleanIsbn.length === 13) {
+                      // Check ISBN-13 checksum
+                      let sum = 0;
+                      for (let i = 0; i < 13; i++) {
+                        sum += parseInt(cleanIsbn[i]) * (i % 2 === 0 ? 1 : 3);
+                      }
+                      if (sum % 10 !== 0) {
+                        errors.push(`ISBN property 'isbn' value '${strVal}' has an invalid ISBN-13 checksum`);
+                      }
                     }
                   }
                 });

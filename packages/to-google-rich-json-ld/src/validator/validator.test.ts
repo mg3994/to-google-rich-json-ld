@@ -154,4 +154,49 @@ describe('SchemaValidator', () => {
     expect(errors.length).toBeGreaterThan(0);
     expect(errors.some(err => err.includes("ratingValue") && err.includes("is less than 'worstRating'"))).toBe(true);
   });
+
+  it('should issue a warning when ISBN checksum calculation fails for ISBN-10 or ISBN-13', () => {
+    const builder = new ASTBuilder();
+    const validator = new SchemaValidator();
+
+    const invalidIsbn10 = {
+      "@context": "https://schema.org",
+      "@type": "Book",
+      "name": "Title",
+      "isbn": "0-306-40615-1" // Checksum should be 2, but we supplied 1
+    };
+
+    const ast = builder.build(invalidIsbn10);
+    const errors = validator.validate(ast);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors.some(err => err.includes("isbn") && err.includes("invalid ISBN-10 checksum"))).toBe(true);
+
+    const validIsbn10 = {
+      "@context": "https://schema.org",
+      "@type": "Book",
+      "name": "Title",
+      "isbn": "0-306-40615-2" // Correct checksum
+    };
+    const validAst = builder.build(validIsbn10);
+    const validErrors = validator.validate(validAst);
+    expect(validErrors.length).toBe(0);
+  });
+
+  it('should issue a warning when bestRating is less than or equal to worstRating', () => {
+    const builder = new ASTBuilder();
+    const validator = new SchemaValidator();
+
+    const rawInconsistent = {
+      "@context": "https://schema.org",
+      "@type": "AggregateRating",
+      "ratingValue": 3,
+      "worstRating": 5,
+      "bestRating": 1 // Inconsistent bounds
+    };
+
+    const ast = builder.build(rawInconsistent);
+    const errors = validator.validate(ast);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors.some(err => err.includes("bestRating") && err.includes("must be greater than 'worstRating'"))).toBe(true);
+  });
 });
