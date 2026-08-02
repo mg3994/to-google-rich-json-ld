@@ -13,7 +13,8 @@ describe('SchemaValidator', () => {
       "name": "Widget",
       "offers": {
         "@type": "Offer",
-        "price": 10
+        "price": 10,
+        "priceCurrency": "USD"
       }
     };
 
@@ -198,5 +199,56 @@ describe('SchemaValidator', () => {
     const errors = validator.validate(ast);
     expect(errors.length).toBeGreaterThan(0);
     expect(errors.some(err => err.includes("bestRating") && err.includes("must be greater than 'worstRating'"))).toBe(true);
+  });
+
+  it('should issue a warning when coordinates fall out of range [-90, 90] / [-180, 180]', () => {
+    const builder = new ASTBuilder();
+    const validator = new SchemaValidator();
+
+    const outOfBoundsCoords = {
+      "@context": "https://schema.org",
+      "@type": "GeoCoordinates",
+      "latitude": 95.0, // Invalid latitude > 90
+      "longitude": -190.0 // Invalid longitude < -180
+    };
+
+    const ast = builder.build(outOfBoundsCoords);
+    const errors = validator.validate(ast);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors.some(err => err.includes("latitude") && err.includes("must be within"))).toBe(true);
+    expect(errors.some(err => err.includes("longitude") && err.includes("must be within"))).toBe(true);
+  });
+
+  it('should issue a warning when Offer has a price but is missing priceCurrency', () => {
+    const builder = new ASTBuilder();
+    const validator = new SchemaValidator();
+
+    const rawOffer = {
+      "@context": "https://schema.org",
+      "@type": "Offer",
+      "price": 99.99
+    };
+
+    const ast = builder.build(rawOffer);
+    const errors = validator.validate(ast);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors.some(err => err.includes("priceCurrency") && err.includes("missing"))).toBe(true);
+  });
+
+  it('should issue a warning when a Date property represents an invalid calendar date', () => {
+    const builder = new ASTBuilder();
+    const validator = new SchemaValidator();
+
+    const rawBook = {
+      "@context": "https://schema.org",
+      "@type": "Book",
+      "name": "Leap Year Out of Range",
+      "datePublished": "2026-02-29" // 2026 is not a leap year, so Feb 29 is invalid
+    };
+
+    const ast = builder.build(rawBook);
+    const errors = validator.validate(ast);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors.some(err => err.includes("datePublished") && err.includes("invalid calendar date"))).toBe(true);
   });
 });

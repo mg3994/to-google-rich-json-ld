@@ -1,6 +1,17 @@
 import { ASTNode } from '../types/index.js';
 import schemaMetadata from '../generated/schema.json' with { type: 'json' };
 
+const isValidCalendarDate = (dateStr: string): boolean => {
+  const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return true;
+  const y = parseInt(match[1]);
+  const m = parseInt(match[2]);
+  const d = parseInt(match[3]);
+  if (m < 1 || m > 12) return false;
+  const daysInMonth = [31, (y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0)) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return d >= 1 && d <= daysInMonth[m - 1];
+};
+
 export class SchemaValidator {
   private types: Record<string, { parent: string | null; properties: string[] }>;
   private properties: Record<string, { domain: string[]; range: string[] }>;
@@ -87,6 +98,19 @@ export class SchemaValidator {
           }
         }
 
+        // Check Offer missing priceCurrency warning
+        const isOfferNode = n.types.some(t => {
+          const lt = t.replace("https://schema.org/", "").replace("http://schema.org/", "");
+          return lt === "Offer" || lt === "AggregateOffer";
+        });
+        if (isOfferNode) {
+          const hasPrice = "price" in n.properties || "https://schema.org/price" in n.properties || "lowPrice" in n.properties || "https://schema.org/lowPrice" in n.properties;
+          const hasCurrency = "priceCurrency" in n.properties || "https://schema.org/priceCurrency" in n.properties;
+          if (hasPrice && !hasCurrency) {
+            errors.push(`Offer defines a price but is missing required 'priceCurrency' property (highly recommended by Google)`);
+          }
+        }
+
         n.types.forEach(typeIRI => {
           const typeName = typeIRI.replace("https://schema.org/", "");
           if (typeName && !this.types[typeName]) {
@@ -105,8 +129,8 @@ export class SchemaValidator {
                 }
               }
 
-              // Datetime property timezone validation (e.g. for datePublished, dateModified)
-              if (propLocalName.toLowerCase().includes("date")) {
+              // Datetime property timezone & calendar validation
+              if (propLocalName.toLowerCase().includes("date") || propLocalName === "availabilityStarts" || propLocalName === "availabilityEnds") {
                 propValues.forEach(valNode => {
                   let strVal: string | null = null;
                   if (valNode.type === "Literal" && typeof valNode.value === 'string') {
@@ -115,11 +139,15 @@ export class SchemaValidator {
                     strVal = valNode.value;
                   }
 
-                  if (strVal && strVal.includes("T")) {
-                    // Check if it includes a timezone designator: ends with Z, or matches standard timezone offset regex
-                    const hasTimezone = strVal.endsWith("Z") || /[+-]\d{2}:?\d{2}$/.test(strVal);
-                    if (!hasTimezone) {
-                      errors.push(`Datetime property '${propLocalName}' is missing a time zone (optional, but highly recommended by Google)`);
+                  if (strVal) {
+                    if (!isValidCalendarDate(strVal)) {
+                      errors.push(`Date property '${propLocalName}' value '${strVal}' represents an invalid calendar date`);
+                    } else if (strVal.includes("T")) {
+                      // Check if it includes a timezone designator: ends with Z, or matches standard timezone offset regex
+                      const hasTimezone = strVal.endsWith("Z") || /[+-]\d{2}:?\d{2}$/.test(strVal);
+                      if (!hasTimezone) {
+                        errors.push(`Datetime property '${propLocalName}' is missing a time zone (optional, but highly recommended by Google)`);
+                      }
                     }
                   }
                 });
@@ -156,8 +184,8 @@ export class SchemaValidator {
 
                   if (strVal) {
                     const cleanIsbn = strVal.replace(/[-\s]/g, "");
-                    const isWellFormed = (cleanIsbn.length === 10 && /^\d{9}[\dX]$/i.test(cleanIsbn)) || (cleanIsbn.length === 13 && /^\d{13}$/.test(cleanIsbn));
-                    if (!isWellFormed) {
+                    const isWellForm = (cleanIsbn.length === 10 && /^\d{9}[\dX]$/i.test(cleanIsbn)) || (cleanIsbn.length === 13 && /^\d{13}$/.test(cleanIsbn));
+                    if (!isWellForm) {
                       errors.push(`ISBN property 'isbn' value '${strVal}' is not a valid ISBN-10 or ISBN-13 number`);
                     } else if (cleanIsbn.length === 10) {
                       // Check ISBN-10 checksum
@@ -216,6 +244,30 @@ export class SchemaValidator {
 
                   if (numVal !== null && numVal < 0) {
                     errors.push(`Price property '${propLocalName}' value '${numVal}' cannot be negative`);
+                  }
+                });
+              }
+
+              // Coordinate range validation warning
+              if (propLocalName === "latitude" || propLocalName === "longitude") {
+                propValues.forEach(valNode => {
+                  let numVal: number | null = null;
+                  if (valNode.type === "Literal" && typeof valNode.value === 'number') {
+                    numVal = valNode.value;
+                  } else if (valNode.type === "ValueObject" && typeof valNode.value === 'number') {
+                    numVal = valNode.value;
+                  } else if (valNode.type === "Literal" && typeof valNode.value === 'string') {
+                    numVal = parseFloat(valNode.value);
+                  } else if (valNode.type === "ValueObject" && typeof valNode.value === 'string') {
+                    numVal = parseFloat(valNode.value);
+                  }
+
+                  if (numVal !== null) {
+                    if (propLocalName === "latitude" && (numVal < -90 || numVal > 90)) {
+                      errors.push(`Latitude property 'latitude' value '${numVal}' must be within [-90, 90]`);
+                    } else if (propLocalName === "longitude" && (numVal < -180 || numVal > 180)) {
+                      errors.push(`Longitude property 'longitude' value '${numVal}' must be within [-180, 180]`);
+                    }
                   }
                 });
               }
