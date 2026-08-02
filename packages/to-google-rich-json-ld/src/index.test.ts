@@ -224,4 +224,24 @@ describe('GoogleRichJsonLdEngine', () => {
     const result = await validate(phoneDoc);
     expect(result.errors.some(err => err.includes("telephone") && err.includes("missing a '+' prefix"))).toBe(true);
   });
+
+  it('should auto-adjust bestRating to match ratingValue if ratingValue exceeds bestRating', async () => {
+    const ratingDoc = {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      "name": "Premium Keyboard",
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": 9.5,
+        "bestRating": 5 // Out-of-bounds (ratingValue is larger than bestRating)
+      },
+      "offers": {
+        "@type": "Offer",
+        "price": 120
+      }
+    };
+
+    const converted = await convert(ratingDoc);
+    expect(converted["aggregateRating"]["bestRating"]).toBe(9.5);
+  });
 });

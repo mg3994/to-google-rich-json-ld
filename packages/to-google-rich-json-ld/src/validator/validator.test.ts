@@ -86,4 +86,38 @@ describe('SchemaValidator', () => {
     expect(errors.length).toBeGreaterThan(0);
     expect(errors.some(err => err.includes("telephone") && err.includes("missing a '+' prefix"))).toBe(true);
   });
+
+  it('should issue a warning for invalid isbn format', () => {
+    const builder = new ASTBuilder();
+    const validator = new SchemaValidator();
+
+    const raw = {
+      "@context": "https://schema.org",
+      "@type": "Book",
+      "name": "The Great Gatsby",
+      "isbn": "invalid-isbn-123"
+    };
+
+    const ast = builder.build(raw);
+    const errors = validator.validate(ast);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors.some(err => err.includes("isbn") && err.includes("not a valid ISBN"))).toBe(true);
+  });
+
+  it('should issue a warning for invalid email format', () => {
+    const builder = new ASTBuilder();
+    const validator = new SchemaValidator();
+
+    const raw = {
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      "name": "Shop",
+      "email": "notanemail.com" // Missing '@'
+    };
+
+    const ast = builder.build(raw);
+    const errors = validator.validate(ast);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors.some(err => err.includes("email") && err.includes("missing an '@' symbol"))).toBe(true);
+  });
 });

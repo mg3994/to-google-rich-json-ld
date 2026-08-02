@@ -98,6 +98,42 @@ export class SchemaValidator {
                   }
                 });
               }
+
+              // ISBN format/length validation warning
+              if (propLocalName === "isbn") {
+                propValues.forEach(valNode => {
+                  let strVal: string | null = null;
+                  if (valNode.type === "Literal" && typeof valNode.value === 'string') {
+                    strVal = valNode.value;
+                  } else if (valNode.type === "ValueObject" && typeof valNode.value === 'string') {
+                    strVal = valNode.value;
+                  }
+
+                  if (strVal) {
+                    const cleanIsbn = strVal.replace(/[-\s]/g, "");
+                    const isValidIsbn = (cleanIsbn.length === 10 && /^\d{9}[\dX]$/i.test(cleanIsbn)) || (cleanIsbn.length === 13 && /^\d{13}$/.test(cleanIsbn));
+                    if (!isValidIsbn) {
+                      errors.push(`ISBN property 'isbn' value '${strVal}' is not a valid ISBN-10 or ISBN-13 number`);
+                    }
+                  }
+                });
+              }
+
+              // Email format validation warning
+              if (propLocalName === "email") {
+                propValues.forEach(valNode => {
+                  let strVal: string | null = null;
+                  if (valNode.type === "Literal" && typeof valNode.value === 'string') {
+                    strVal = valNode.value;
+                  } else if (valNode.type === "ValueObject" && typeof valNode.value === 'string') {
+                    strVal = valNode.value;
+                  }
+
+                  if (strVal && !strVal.includes("@")) {
+                    errors.push(`Email property 'email' value '${strVal}' is missing an '@' symbol and is not a valid email address`);
+                  }
+                });
+              }
             }
           }
         });

@@ -877,9 +877,45 @@ export class CompatibilityEngine {
                 const hasBest = bestKey in properties || "https://schema.org/bestRating" in properties || "bestRating" in properties;
                 const hasWorst = worstKey in properties || "https://schema.org/worstRating" in properties || "worstRating" in properties;
 
-                if (!hasBest) {
-                  properties[bestKey] = [new LiteralNodeImpl(5)];
+                // Extract ratingValue number for boundaries check
+                const ratingValueNode = properties[ratingValueKey] && properties[ratingValueKey][0];
+                let ratingValNum: number | null = null;
+                if (ratingValueNode) {
+                  if (ratingValueNode.type === "Literal" && typeof ratingValueNode.value === 'number') {
+                    ratingValNum = ratingValueNode.value;
+                  } else if (ratingValueNode.type === "ValueObject" && typeof ratingValueNode.value === 'number') {
+                    ratingValNum = ratingValueNode.value;
+                  } else if (ratingValueNode.type === "Literal" && typeof ratingValueNode.value === 'string') {
+                    ratingValNum = parseFloat(ratingValueNode.value);
+                  } else if (ratingValueNode.type === "ValueObject" && typeof ratingValueNode.value === 'string') {
+                    ratingValNum = parseFloat(ratingValueNode.value);
+                  }
                 }
+
+                if (!hasBest) {
+                  const defaultBest = (ratingValNum !== null && ratingValNum > 5) ? ratingValNum : 5;
+                  properties[bestKey] = [new LiteralNodeImpl(defaultBest)];
+                } else if (ratingValNum !== null) {
+                  // If bestRating is present but smaller than ratingValue, adjust it to match ratingValue
+                  const actualBestKey = bestKey in properties ? bestKey : ("https://schema.org/bestRating" in properties ? "https://schema.org/bestRating" : "bestRating");
+                  const bestNode = properties[actualBestKey] && properties[actualBestKey][0];
+                  let bestValNum: number | null = null;
+                  if (bestNode) {
+                    if (bestNode.type === "Literal" && typeof bestNode.value === 'number') {
+                      bestValNum = bestNode.value;
+                    } else if (bestNode.type === "ValueObject" && typeof bestNode.value === 'number') {
+                      bestValNum = bestNode.value;
+                    } else if (bestNode.type === "Literal" && typeof bestNode.value === 'string') {
+                      bestValNum = parseFloat(bestNode.value);
+                    } else if (bestNode.type === "ValueObject" && typeof bestNode.value === 'string') {
+                      bestValNum = parseFloat(bestNode.value);
+                    }
+                  }
+                  if (bestValNum !== null && ratingValNum > bestValNum) {
+                    properties[actualBestKey] = [new LiteralNodeImpl(ratingValNum)];
+                  }
+                }
+
                 if (!hasWorst) {
                   properties[worstKey] = [new LiteralNodeImpl(1)];
                 }
