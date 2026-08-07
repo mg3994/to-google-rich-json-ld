@@ -51,7 +51,7 @@ describe('SchemaValidator', () => {
     const ast = builder.build(raw);
     const errors = validator.validate(ast);
     expect(errors.length).toBeGreaterThan(0);
-    expect(errors[0]).toContain("is not valid for Schema.org type");
+    expect(errors[0]).toContain("is not valid for declared Schema.org types");
   });
 
   it('should issue a warning warning when datePublished datetime lacks a timezone', () => {

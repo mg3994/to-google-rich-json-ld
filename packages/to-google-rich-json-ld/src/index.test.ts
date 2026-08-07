@@ -296,4 +296,39 @@ describe('GoogleRichJsonLdEngine', () => {
     expect(info.keywordsUsed).toContain("@context");
     expect(info.schemaTypes).toContain("Product");
   });
+
+  it('should validate multi-typed Schema.org nodes correctly by collecting the union of valid properties', async () => {
+    // Product does not have 'downloadUrl', but SoftwareApplication does.
+    // If a node is declared as both, 'downloadUrl' should be valid!
+    const multiTypeDoc = {
+      "@context": "https://schema.org",
+      "@type": ["Product", "SoftwareApplication"],
+      "name": "Super Game Client",
+      "offers": {
+        "@type": "Offer",
+        "price": 0,
+        "priceCurrency": "USD"
+      },
+      "downloadUrl": "https://example.com/download" // Valid for SoftwareApplication, shouldn't raise a Product validation error
+    };
+
+    const valResult = await validate(multiTypeDoc);
+    expect(valResult.valid).toBe(true);
+  });
+
+  it('should secure all Schema.org property keys from http to https', async () => {
+    const rawDoc = {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      "name": "Insecure Key Pro",
+      "http://schema.org/offers": {
+        "@type": "Offer",
+        "price": 10,
+        "priceCurrency": "USD"
+      }
+    };
+
+    const converted = await convert(rawDoc);
+    expect(converted["offers"]).toBeDefined(); // Compacted offers property
+  });
 });

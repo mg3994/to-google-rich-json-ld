@@ -407,7 +407,13 @@ export class CompatibilityEngine {
             if (node.type === "NodeObject") {
               const types = Array.from(new Set(node.types.map(t => t.startsWith("http://schema.org") ? t.replace("http://schema.org", "https://schema.org") : t)));
               const id = node.id && node.id.startsWith("http://schema.org") ? node.id.replace("http://schema.org", "https://schema.org") : node.id;
-              return new NodeObjectNodeImpl(id, types, node.properties);
+
+              const properties: Record<string, ASTNode[]> = {};
+              for (const [k, v] of Object.entries(node.properties)) {
+                const secureKey = k.startsWith("http://schema.org/") ? k.replace("http://schema.org/", "https://schema.org/") : k;
+                properties[secureKey] = v;
+              }
+              return new NodeObjectNodeImpl(id, types, properties);
             }
 
             // Secure enum values inside ValueObjects

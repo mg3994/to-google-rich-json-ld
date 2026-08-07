@@ -115,76 +115,87 @@ export class SchemaValidator {
           }
         }
 
+        // Collect union of all valid properties across all defined types for this node
+        const allDeclaredTypesValidProps = new Set<string>();
+        let hasAnyKnownTypes = false;
+
         n.types.forEach(typeIRI => {
-          const typeName = typeIRI.replace("https://schema.org/", "");
+          const typeName = typeIRI.replace("https://schema.org/", "").replace("http://schema.org/", "");
           if (typeName && !this.types[typeName]) {
-            if (typeIRI.startsWith("https://schema.org/") || !typeIRI.includes(":")) {
+            if (typeIRI.startsWith("https://schema.org/") || typeIRI.startsWith("http://schema.org/") || !typeIRI.includes(":")) {
               errors.push(`Unknown Schema.org type: '${typeIRI}'`);
             }
           } else if (this.types[typeName]) {
-            const validProperties = this.getAllPropertiesForType(typeName);
-            for (const [propName, propValues] of Object.entries(n.properties)) {
-              if (propName.startsWith("@")) continue;
-              const propLocalName = propName.replace("https://schema.org/", "").replace("http://schema.org/", "");
+            hasAnyKnownTypes = true;
+            const validPropsForType = this.getAllPropertiesForType(typeName);
+            validPropsForType.forEach(p => allDeclaredTypesValidProps.add(p));
+          }
+        });
 
-              if (!validProperties.has(propLocalName)) {
-                if (propName.startsWith("https://schema.org/") || !propName.includes(":")) {
-                  errors.push(`Property '${propName}' is not valid for Schema.org type '${typeIRI}'`);
+        // Now validate properties against the union of all valid properties
+        if (hasAnyKnownTypes) {
+          for (const [propName, propValues] of Object.entries(n.properties)) {
+            if (propName.startsWith("@")) continue;
+            const propLocalName = propName.replace("https://schema.org/", "").replace("http://schema.org/", "");
+
+            if (!allDeclaredTypesValidProps.has(propLocalName)) {
+              if (propName.startsWith("https://schema.org/") || propName.startsWith("http://schema.org/") || !propName.includes(":")) {
+                errors.push(`Property '${propName}' is not valid for declared Schema.org types [${n.types.join(", ")}]`);
+              }
+            }
+
+            // Datetime property timezone & calendar validation
+            if (propLocalName.toLowerCase().includes("date") || propLocalName === "availabilityStarts" || propLocalName === "availabilityEnds") {
+              propValues.forEach(valNode => {
+                let strVal: string | null = null;
+                if (valNode.type === "Literal" && typeof valNode.value === 'string') {
+                  strVal = valNode.value;
+                } else if (valNode.type === "ValueObject" && typeof valNode.value === 'string') {
+                  strVal = valNode.value;
                 }
-              }
 
-              // Datetime property timezone & calendar validation
-              if (propLocalName.toLowerCase().includes("date") || propLocalName === "availabilityStarts" || propLocalName === "availabilityEnds") {
-                propValues.forEach(valNode => {
-                  let strVal: string | null = null;
-                  if (valNode.type === "Literal" && typeof valNode.value === 'string') {
-                    strVal = valNode.value;
-                  } else if (valNode.type === "ValueObject" && typeof valNode.value === 'string') {
-                    strVal = valNode.value;
-                  }
-
-                  if (strVal) {
-                    if (!isValidCalendarDate(strVal)) {
-                      errors.push(`Date property '${propLocalName}' value '${strVal}' represents an invalid calendar date`);
-                    } else if (strVal.includes("T")) {
-                      // Check if it includes a timezone designator: ends with Z, or matches standard timezone offset regex
-                      const hasTimezone = strVal.endsWith("Z") || /[+-]\d{2}:?\d{2}$/.test(strVal);
-                      if (!hasTimezone) {
-                        errors.push(`Datetime property '${propLocalName}' is missing a time zone (optional, but highly recommended by Google)`);
-                      }
+                if (strVal) {
+                  if (!isValidCalendarDate(strVal)) {
+                    errors.push(`Date property '${propLocalName}' value '${strVal}' represents an invalid calendar date`);
+                  } else if (strVal.includes("T")) {
+                    // Check if it includes a timezone designator: ends with Z, or matches standard timezone offset regex
+                    const hasTimezone = strVal.endsWith("Z") || /[+-]\d{2}:?\d{2}$/.test(strVal);
+                    if (!hasTimezone) {
+                      errors.push(`Datetime property '${propLocalName}' is missing a time zone (optional, but highly recommended by Google)`);
                     }
                   }
-                });
-              }
+                }
+              });
+            }
 
-              // Telephone number E.164 format validation warning
-              if (propLocalName === "telephone") {
-                propValues.forEach(valNode => {
-                  let strVal: string | null = null;
-                  if (valNode.type === "Literal" && typeof valNode.value === 'string') {
-                    strVal = valNode.value;
-                  } else if (valNode.type === "ValueObject" && typeof valNode.value === 'string') {
-                    strVal = valNode.value;
-                  }
+            // Telephone number E.164 format validation warning
+            if (propLocalName === "telephone") {
+              propValues.forEach(valNode => {
+                let strVal: string | null = null;
+                if (valNode.type === "Literal" && typeof valNode.value === 'string') {
+                  strVal = valNode.value;
+                } else if (valNode.type === "ValueObject" && typeof valNode.value === 'string') {
+                  strVal = valNode.value;
+                }
 
-                  if (strVal) {
-                    const hasPlus = strVal.trim().startsWith("+");
-                    if (!hasPlus) {
-                      errors.push(`Telephone property 'telephone' value '${strVal}' is missing a '+' prefix or is not in recommended E.164 format`);
-                    }
+                if (strVal) {
+                  const hasPlus = strVal.trim().startsWith("+");
+                  if (!hasPlus) {
+                    errors.push(`Telephone property 'telephone' value '${strVal}' is missing a '+' prefix or is not in recommended E.164 format`);
                   }
-                });
-              }
+                }
+              });
+            }
 
-              // ISBN format/length and checksum validation warning
-              if (propLocalName === "isbn") {
-                propValues.forEach(valNode => {
-                  let strVal: string | null = null;
-                  if (valNode.type === "Literal" && typeof valNode.value === 'string') {
-                    strVal = valNode.value;
-                  } else if (valNode.type === "ValueObject" && typeof valNode.value === 'string') {
-                    strVal = valNode.value;
-                  }
+            // ISBN format/length and checksum validation warning
+            if (propLocalName === "isbn") {
+              propValues.forEach(valNode => {
+                let strVal: string | null = null;
+                if (valNode.type === "Literal" && typeof valNode.value === 'string') {
+                  strVal = valNode.value;
+                } else if (valNode.type === "ValueObject" && typeof valNode.value === 'string') {
+                  strVal = valNode.value;
+                }
 
                   if (strVal) {
                     const cleanIsbn = strVal.replace(/[-\s]/g, "");
@@ -277,7 +288,6 @@ export class SchemaValidator {
               }
             }
           }
-        });
 
         for (const val of Object.values(n.properties)) {
           val.forEach(traverse);
