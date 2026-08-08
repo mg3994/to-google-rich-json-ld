@@ -65,10 +65,16 @@ const areNodesEqual = (node1: ASTNode, node2: ASTNode, visited = new Set<string>
     }
     visited.add(pairKey);
 
-    if (n1.types.length !== n2.types.length || !n1.types.every((t, i) => t === n2.types[i])) return false;
+    if (n1.types.length !== n2.types.length || !n1.types.every((t, i) => t === n2.types[i])) {
+      visited.delete(pairKey);
+      return false;
+    }
     const keys1 = Object.keys(n1.properties);
     const keys2 = Object.keys(n2.properties);
-    if (keys1.length !== keys2.length) return false;
+    if (keys1.length !== keys2.length) {
+      visited.delete(pairKey);
+      return false;
+    }
     const match = keys1.every(k => {
       const val1 = n1.properties[k];
       const val2 = n2.properties[k];
